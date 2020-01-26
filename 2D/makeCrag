@@ -1,0 +1,7 @@
+# convert an SVG image into a Delauney triangulation
+./bin/svgToPoly ./data/crag.svg ./data/crag.poly
+# a good initial mesh
+#./bin/triangle -q35 ./data/crag.poly 
+# a good denser one
+./bin/triangle -q35a0.001 ./data/crag.poly 
+./bin/viewDelaunay ./data/crag.1

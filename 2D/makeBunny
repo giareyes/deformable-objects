@@ -1,0 +1,4 @@
+# convert an SVG image into a Delauney triangulation
+./bin/svgToPoly ./data/bunny.svg ./data/bunny.poly
+./bin/triangle ./data/bunny.poly 
+./bin/viewDelaunay ./data/bunny.1

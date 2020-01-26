@@ -1,0 +1,4 @@
+# convert an SVG image into a Delauney triangulation
+./bin/svgToPoly ./data/circle.svg ./data/circle.poly
+./bin/triangle -D -q 45 ./data/circle.poly 
+./bin/viewDelaunay ./data/circle.1
