@@ -1,0 +1,12 @@
+#include "WALL.h"
+#include <math.h>
+
+///////////////////////////////////////////////////////////////////////////////
+// Constructor
+///////////////////////////////////////////////////////////////////////////////
+WALL::WALL(const VEC2& normal, const VEC2& point) :
+  _normal(normal), _point(point)
+{
+  // just in case, normalize the normal vector
+  _normal.normalize();
+}

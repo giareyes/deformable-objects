@@ -3,15 +3,10 @@
 
 #include <cassert>
 
-#define USING_OSX 1
-
-#include "./src/Eigen/Dense"
-#include "./src/Eigen/Sparse"
+#include "Eigen/Dense"
 using namespace Eigen;
 
-//#define Real float
 #define Real double
-//#define Real long double
 
 typedef Matrix<Real, 2, 2 > MATRIX2;
 typedef Matrix<Real, 3, 3 > MATRIX3;
@@ -24,11 +19,5 @@ typedef Matrix<int, 3, 1 > VEC3I;
 
 typedef Matrix<Real, Dynamic, Dynamic> MATRIX;
 typedef Matrix<Real, Dynamic, 1> VECTOR;
-typedef Eigen::SparseMatrix<Real> SPARSE_MATRIX;
-typedef Eigen::Triplet<Real> TRIPLET;
-
-#ifndef NDEBUG
-#define NDEBUG
-#endif
 
 #endif
