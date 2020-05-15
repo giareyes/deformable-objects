@@ -399,9 +399,15 @@ string toUpper(const string& input)
 ///////////////////////////////////////////////////////////////////////
 void readCommandLine(int argc, char** argv)
 {
-  if (argc > 1)
+  if (argc < 3)
   {
-    string sceneType(argv[1]);
+    cout << " invalid number of arguments. Args given: " << argc << ". need 2 filenames" << endl;
+    exit(0);
+  }
+
+  if (argc > 3)
+  {
+    string sceneType(argv[3]);
     sceneType = toUpper(sceneType);
 
     if (sceneType.compare("LSHEAR") == 0)
@@ -420,9 +426,9 @@ void readCommandLine(int argc, char** argv)
       sceneNum = 0;
     }
 
-    if (argc > 2)
+    if (argc > 4)
     {
-      for(int x = 2; x < argc; x++)
+      for(int x = 4; x < argc; x++)
       {
         if (argv[x][1] == 'm')
           meshFlag = 1;
@@ -438,7 +444,7 @@ void readCommandLine(int argc, char** argv)
   }
 
   // build the scene
-  triangleMesh.buildBlob(1.15, sceneNum);
+  triangleMesh.buildBlob(1.15, sceneNum, argv[1], argv[2]);
   bodyForce[0] = 0;
   bodyForce[1] = -0.3;
 
@@ -452,7 +458,7 @@ void readCommandLine(int argc, char** argv)
 ///////////////////////////////////////////////////////////////////////
 int main(int argc, char** argv)
 {
-  cout << " Usage: " << argv[0] << " <which scene> " << endl;
+  cout << " Usage: " << argv[0] << "<vertex filename> <vertex filename> <which scene> <extra args>" << endl;
   cout << "\t Valid values: " << endl;
   cout << "\t\t <which test>: SINGLE, LSHEAR, RSHEAR, SQUASH, STRETCH, MOTION" << endl;
 

@@ -18,7 +18,7 @@ public:
   // add walls
   void addWall(const WALL& wall)             { _walls.push_back(wall); };
   // build the different kinds of tests
-  void buildBlob(const Real xPos, int sceneNum);
+  void buildBlob(const Real xPos, int sceneNum, const char* file_nodes, const char* file_triangles);
 
   bool stepQuasistatic();
 
