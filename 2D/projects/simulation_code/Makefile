@@ -6,7 +6,7 @@ COMPILER = g++
 CC         = g++
 CFLAGS     = ${CFLAGS_COMMON} -I ../../ -O3
 LDFLAGS    = ${LDFLAGS_COMMON}
-EXECUTABLE = sim
+EXECUTABLE = ../../bin/sim
 
 SOURCES    = simulation.cpp \
 						 STVK.cpp \
