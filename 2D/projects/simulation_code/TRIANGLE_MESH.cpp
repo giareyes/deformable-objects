@@ -65,10 +65,11 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
         int index;
         double x;
         double y;
+        // int constrained;
 
         // if it doesnt match this format, there's an error
         // there's another number on the line but idk what it means
-        // TO DO: ask what this # means!!!
+        // TO DO: ask what this # means!!! It looks like it means outer verts?
         if(!(iss2 >> index >> x >> y))
         {
           cout << "error: issue with file format" << endl;
@@ -77,13 +78,14 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
         }
 
         // store this new vertex
-        // TO DO: figure out whats going on with window position 
+        // TO DO: figure out whats going on with window position
         VEC2 vert(x + 1, y + 1);
         _vertices.push_back(vert);
         _restVertices.push_back(vert);
 
         // right now, I am unsure what should be constrained / unconstrained. will come back to this
         // TO DO: find out how to differentiate between constrained / unconstrained verts!!
+        // (constrained)? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
         _unconstrainedVertices.push_back(i);
       }
     }
@@ -152,9 +154,9 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
 
       // make and save triangle
       vector<VEC2*> triangle;
-      triangle.push_back(&_vertices[v1]);
-      triangle.push_back(&_vertices[v2]);
-      triangle.push_back(&_vertices[v3]);
+      triangle.push_back(&_vertices[v1 - 1]);
+      triangle.push_back(&_vertices[v2 - 1]);
+      triangle.push_back(&_vertices[v3 - 1]);
       _triangles.push_back(TRIANGLE(_material, triangle));
     }
   }
