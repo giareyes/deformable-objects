@@ -40,7 +40,7 @@ bool singleStep = false;
 float dt = 1.0/100.0;
 
 // the current viewer eye position
-VEC3 eyeCenter(0.9, 0.6, 1);
+VEC3 eyeCenter(0, 0, 1);
 
 // current zoom level into the field
 float zoom = 2.0;
@@ -448,9 +448,9 @@ void readCommandLine(int argc, char** argv)
   bodyForce[0] = 0;
   bodyForce[1] = -0.3;
 
-  triangleMesh.addWall(WALL(VEC2(1,0), VEC2(-0.09,0)));
-  triangleMesh.addWall(WALL(VEC2(-1,0), VEC2(1.89,0)));
-  triangleMesh.addWall(WALL(VEC2(0,1), VEC2(0,-0.35)));
+  triangleMesh.addWall(WALL(VEC2(1,0), VEC2(-0.98,0)));
+  triangleMesh.addWall(WALL(VEC2(-1,0), VEC2(0.98,0)));
+  triangleMesh.addWall(WALL(VEC2(0,1), VEC2(0,-0.95)));
 
 }
 

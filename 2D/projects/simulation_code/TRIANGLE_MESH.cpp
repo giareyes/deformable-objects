@@ -79,7 +79,7 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
 
         // store this new vertex
         // TO DO: figure out whats going on with window position
-        VEC2 vert(x + 1, y + 1);
+        VEC2 vert(x , y );
         _vertices.push_back(vert);
         _restVertices.push_back(vert);
 
