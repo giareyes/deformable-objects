@@ -312,22 +312,39 @@ MATRIX TRIANGLE::precomputedQuadCoef()
 VECTOR TRIANGLE::computeForceVector()
 {
   VECTOR forceVector(6);
+  MATRIX2 F = computeF();
+  MATRIX2 pk1 = _material->PK1(F);
+  MATRIX dfdu(4,6);
 
-  forceVector = precomputedCubicCoef();
+//multiply pk1 by -1 and area as discussed in OH
+  pk1 = -1*restArea()*pk1;
+
+  //get vectorized df/du
+  dfdu = pFpuVectorized();
+
+  forceVector = dfdu.transpose()*vectorize(pk1);
 
   return forceVector;
 }
 
 ///////////////////////////////////////////////////////////////////////
-vector<MATRIX> TRIANGLE::computeForceJacobian()
+MATRIX TRIANGLE::computeForceJacobian()
 {
-  //MATRIX2 F = computeF();
-  vector<MATRIX>  jacobian;
+  MATRIX2 F = computeF();
+  MATRIX jacobian(6,6);
+  MATRIX dfdu(4,6);
+
+  //get 4x4 matrix of derivative of pk1. This is matrix B from class
+  MATRIX dpdf = _material->DPDF(F);
+
+  //multiply dpdf by -1 and area as discussed in OH
+  dpdf = -1*restArea()*dpdf;
+
+  //get vectorized df/du. This is matrix A from class
+  dfdu = pFpuVectorized();
 
   // d^2 psi/ dx^2 = A transpose * B * A
-  // jacobian = precomputedQuadCoef() + _linearCoef;
-  jacobian.push_back(precomputedQuadCoef());
-  jacobian.push_back(_constCoef);
+  jacobian = dfdu.transpose() * dpdf * dfdu;
 
   return jacobian;
 }

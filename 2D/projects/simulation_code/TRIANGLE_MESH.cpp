@@ -23,7 +23,7 @@ TRIANGLE_MESH::~TRIANGLE_MESH()
   delete _material;
 }
 
-void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_nodes, const char* file_triangles)
+void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_nodes)
 {
   _vertices.clear();
   _triangles.clear();
@@ -32,7 +32,8 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
   int vertCount;
   int size;
 
-  std::ifstream nodes(file_nodes);
+  string nodeFile = file_nodes + string(".node");
+  std::ifstream nodes(nodeFile);
 
   if (nodes.is_open())
   {
@@ -54,6 +55,8 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
     // we are only dealing with 2d now, but maybe we want to keep the option open for 3d implementation
     if(size == 2)
     {
+      VEC2 mins(1000,1000);
+      VEC2 maxs(-1000,-1000);
       // store every vertex into our array
       for(int i = 0; i < vertCount; i++)
       {
@@ -68,8 +71,6 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
         // int constrained;
 
         // if it doesnt match this format, there's an error
-        // there's another number on the line but idk what it means
-        // TO DO: ask what this # means!!! It looks like it means outer verts?
         if(!(iss2 >> index >> x >> y))
         {
           cout << "error: issue with file format" << endl;
@@ -78,15 +79,30 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
         }
 
         // store this new vertex
-        // TO DO: figure out whats going on with window position
-        VEC2 vert(x , y );
+        VEC2 vert(x, y);
         _vertices.push_back(vert);
         _restVertices.push_back(vert);
 
-        // right now, I am unsure what should be constrained / unconstrained. will come back to this
-        // TO DO: find out how to differentiate between constrained / unconstrained verts!!
-        // (constrained)? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
-        _unconstrainedVertices.push_back(i);
+        // find the max and min x,y positions
+        if (vert[0] < mins[0])
+          mins[0] = vert[0];
+        if (vert[1] < mins[1])
+          mins[1] = vert[1];
+        if (vert[0] > maxs[0])
+          maxs[0] = vert[0];
+        if (vert[1] > maxs[1])
+          maxs[1] = vert[1];
+
+      }
+
+      // shift vertices down so that the object rests on the floor, then constrain some vertices.
+      for(int i = 0; i < vertCount; i++)
+      {
+        _vertices[i][1] += (-0.95 - mins[1]);
+        _restVertices[i][1] += (-0.95 - mins[1]);
+
+        (_restVertices[i][1] < -0.85 || (_restVertices[i][1] > maxs[1] - 1.05 - mins[1]))? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
+        // (_restVertices[i][1] > maxs[1]- 1.05)? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
       }
     }
 
@@ -94,7 +110,7 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
   }
   else // error! shut down
   {
-    cout << " Could not open file " << file_nodes << "!!!" << endl;
+    cout << " Could not open file " << nodeFile << "!!!" << endl;
     exit(0);
   }
 
@@ -102,7 +118,8 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
   nodes.close();
 
   // open the file with the triangle verts!!
-  std::ifstream polys(file_triangles);
+  nodeFile = file_nodes + string(".ele");
+  std::ifstream polys(nodeFile);
 
   if (polys.is_open())
   {
@@ -162,28 +179,31 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
   }
   else // error! shut down
   {
-    cout << " Could not open file " << file_triangles << "!!!" << endl;
+    cout << " Could not open file " << nodeFile << "!!!" << endl;
     nodes.close();
     exit(0);
   }
 
   polys.close();
   printf("file open/close success\n");
-  // exit(0);
 
   // allocate the state vectors
   _DOFs = 2 * (_vertices.size() - _constrainedVertices.size());
 
-  // if (sceneNum)
-  //   basisNoTranslation();
-  // else
-  // {
-  //   setBasisReduction();
-  // }
+  if (sceneNum)
+  {
+    basisNoTranslation();
+    size = _unconstrainedVertices.size()*2;
+  }
+  else
+  {
+    setBasisReduction();
+    size = _vertices.size()*2;
+  }
 
   setMassMatrix();
 
-  VECTOR zeros(_vertices.size()*2);
+  VECTOR zeros(size);
   VECTOR z2(_U.cols());
 
   z2.setZero();
@@ -203,7 +223,7 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
 
   // compute the reverse lookup
   computeVertexToIndexTable();
-  createCoefs();
+  // createCoefs();
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -267,185 +287,12 @@ void TRIANGLE_MESH::setMassMatrix()
 void TRIANGLE_MESH::basisNoTranslation()
 {
   MATRIX U(46,9);
-  // MATRIX svddiag(46, 9);
-  //
-  // U << 0.011446,  -0.002633,  -0.016704,   0.032098,  -0.009118,  -0.054865,  -0.054865,    0.088559,   0.067614,
-  //    0.005271,  -0.001795,  -0.006527,   0.005844,  -0.015733,  -0.019406,  -0.019406,    0.006542,    -0.021152,
-  //    0.004064,  -0.000470,  -0.017430,   0.022485,  -0.002303,  -0.085461,  -0.055144,    0.085461,     0.059172,
-  //    0.009012,  -0.001448,  -0.000137,   0.003981,  -0.011465,  -0.000642,  -0.014926,    0.000642,    -0.017341,
-  //   -0.004064,   0.000470,  -0.022485,   0.017430,   0.002303,  -0.085461,  -0.059079,    0.085461,     0.055184,
-  //    0.009012,  -0.001448,   0.003981,  -0.000137,  -0.011465,   0.000642,  -0.017255,   -0.000642,    -0.014943,
-  //   -0.011446,   0.002633,  -0.032098,   0.016704,   0.009118,  -0.088559,  -0.067503,    0.088559,     0.054882,
-  //    0.005271,  -0.001795,   0.005844,  -0.006527,  -0.015733,   0.006542,  -0.020597,   -0.006542,    -0.019407,
-  //    0.012217,  -0.003448,  -0.042263,   0.064138,  -0.005182,  -0.134988,  -0.079721,    0.134988,     0.101109,
-  //    0.019461,  -0.005735,  -0.006665,   0.013395,  -0.022996,  -0.001420,  -0.013228,    0.001420,    -0.019055,
-  //    0.000000,   0.000000,  -0.048845,   0.048845,   0.000000,  -0.138178,  -0.088842,    0.138178,     0.088817,
-  //    0.022649,  -0.002830,   0.004947,   0.004947,  -0.019589,   0.000000,  -0.014737,   -0.000000,    -0.014741,
-  //   -0.012217,   0.003448,  -0.064138,   0.042263,   0.005182,  -0.134988,  -0.101219,    0.134988,     0.079705,
-  //    0.019461,  -0.005735,   0.013395,  -0.006665,  -0.022996,   0.001420,  -0.018808,   -0.001420,    -0.013217,
-  //    0.012745,  -0.008094,  -0.085459,   0.113785,   0.002792,  -0.134270,  -0.063082,    0.134270,     0.086800,
-  //    0.039573,  -0.011360,  -0.004205,   0.013985,  -0.020846,   0.013096,   0.000750,   -0.013096,    -0.009037,
-  //   -0.012745,   0.008094,  -0.113785,   0.085459,  -0.002792,  -0.134270,  -0.086941,    0.134270,     0.063019,
-  //    0.039573,  -0.011360,   0.013985,  -0.004205,  -0.020846,  -0.013096,  -0.008899,    0.013096,     0.000746,
-  //    0.008654,  -0.002118,  -0.012365,   0.025727,  -0.019616,  -0.066554,  -0.030756,    0.066554,     0.069918,
-  //    0.003497,  -0.001276,  -0.014071,   0.008843,  -0.032046,  -0.041551,  -0.032057,    0.041551,    -0.002250,
-  //    0.011032,  -0.002679,  -0.019256,   0.036220,  -0.017551,  -0.098034,  -0.055586,    0.098034,     0.091227,
-  //    0.004048,  -0.001544,  -0.015372,   0.010157,  -0.034182,  -0.037453,  -0.036060,    0.037453,    -0.005837,
-  //    0.015469,  -0.003856,  -0.029304,   0.052425,  -0.017910,  -0.124694,  -0.070971,    0.124694,     0.114063,
-  //    0.003343,  -0.001598,  -0.017875,   0.008649,  -0.034542,  -0.031420,  -0.033724,    0.031420,    -0.013374,
-  //    0.014198,  -0.003726,  -0.039106,   0.064256,  -0.010398,  -0.140364,  -0.081399,    0.140364,     0.113799,
-  //    0.010418,  -0.003566,  -0.013914,   0.010963,  -0.032107,  -0.019283,  -0.025475,    0.019283,    -0.013915,
-  //   -0.008654,   0.002118,  -0.025727,   0.012365,   0.019616,  -0.066554,  -0.072897,    0.066554,     0.030760,
-  //    0.003498,  -0.001276,   0.008843,  -0.014071,  -0.032046,   0.041551,  -0.005429,   -0.041551,    -0.032057,
-  //   -0.011032,   0.002679,  -0.036220,   0.019256,   0.017551,  -0.098034,  -0.091957,    0.098034,     0.055597,
-  //    0.004048,  -0.001544,   0.010157,  -0.015372,  -0.034182,   0.037453,  -0.006969,   -0.037453,    -0.036057,
-  //   -0.015469,   0.003856,  -0.052425,   0.029304,   0.017910,  -0.124694,  -0.114055,    0.124694,     0.070974,
-  //    0.003343,  -0.001598,   0.008649,  -0.017875,  -0.034542,   0.031420,  -0.012945,   -0.031420,    -0.033711,
-  //   -0.014198,   0.003726,  -0.064256,   0.039106,   0.010398,  -0.140364,  -0.113929,    0.140364,     0.081385,
-  //    0.010418,  -0.003566,   0.010963,  -0.013914,  -0.032107,   0.019283,  -0.013573,   -0.019283,    -0.025460,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000;
-  //
-  //    JacobiSVD<MatrixXd> svd( U, ComputeFullV | ComputeFullU );
-  //    svddiag = svd.matrixU();
-  //    svddiag.conservativeResize(svddiag.rows(),9);
-     // _U = svddiag;
-
-     // free space
-     // U.resize(0,0);
-     _U = U;
+  _U = U;
 }
 
 void TRIANGLE_MESH::setBasisReduction()
 {
   MATRIX U(46,9);
-  // MATRIX T(46,2);
-  // MATRIX svddiag(46, 9);
-  // MATRIX intermediate(46, 11);
-  // svddiag.setIdentity();
-  // // matrix of deformations
-  // U << 0.011446,  -0.002633,  -0.016704,   0.032098,  -0.009118,  -0.054865,  -0.054865,    0.088559,   0.067614,
-  //    0.005271,  -0.001795,  -0.006527,   0.005844,  -0.015733,  -0.019406,  -0.019406,    0.006542,    -0.021152,
-  //    0.004064,  -0.000470,  -0.017430,   0.022485,  -0.002303,  -0.085461,  -0.055144,    0.085461,     0.059172,
-  //    0.009012,  -0.001448,  -0.000137,   0.003981,  -0.011465,  -0.000642,  -0.014926,    0.000642,    -0.017341,
-  //   -0.004064,   0.000470,  -0.022485,   0.017430,   0.002303,  -0.085461,  -0.059079,    0.085461,     0.055184,
-  //    0.009012,  -0.001448,   0.003981,  -0.000137,  -0.011465,   0.000642,  -0.017255,   -0.000642,    -0.014943,
-  //   -0.011446,   0.002633,  -0.032098,   0.016704,   0.009118,  -0.088559,  -0.067503,    0.088559,     0.054882,
-  //    0.005271,  -0.001795,   0.005844,  -0.006527,  -0.015733,   0.006542,  -0.020597,   -0.006542,    -0.019407,
-  //    0.012217,  -0.003448,  -0.042263,   0.064138,  -0.005182,  -0.134988,  -0.079721,    0.134988,     0.101109,
-  //    0.019461,  -0.005735,  -0.006665,   0.013395,  -0.022996,  -0.001420,  -0.013228,    0.001420,    -0.019055,
-  //    0.000000,   0.000000,  -0.048845,   0.048845,   0.000000,  -0.138178,  -0.088842,    0.138178,     0.088817,
-  //    0.022649,  -0.002830,   0.004947,   0.004947,  -0.019589,   0.000000,  -0.014737,   -0.000000,    -0.014741,
-  //   -0.012217,   0.003448,  -0.064138,   0.042263,   0.005182,  -0.134988,  -0.101219,    0.134988,     0.079705,
-  //    0.019461,  -0.005735,   0.013395,  -0.006665,  -0.022996,   0.001420,  -0.018808,   -0.001420,    -0.013217,
-  //    0.012745,  -0.008094,  -0.085459,   0.113785,   0.002792,  -0.134270,  -0.063082,    0.134270,     0.086800,
-  //    0.039573,  -0.011360,  -0.004205,   0.013985,  -0.020846,   0.013096,   0.000750,   -0.013096,    -0.009037,
-  //   -0.012745,   0.008094,  -0.113785,   0.085459,  -0.002792,  -0.134270,  -0.086941,    0.134270,     0.063019,
-  //    0.039573,  -0.011360,   0.013985,  -0.004205,  -0.020846,  -0.013096,  -0.008899,    0.013096,     0.000746,
-  //    0.008654,  -0.002118,  -0.012365,   0.025727,  -0.019616,  -0.066554,  -0.030756,    0.066554,     0.069918,
-  //    0.003497,  -0.001276,  -0.014071,   0.008843,  -0.032046,  -0.041551,  -0.032057,    0.041551,    -0.002250,
-  //    0.011032,  -0.002679,  -0.019256,   0.036220,  -0.017551,  -0.098034,  -0.055586,    0.098034,     0.091227,
-  //    0.004048,  -0.001544,  -0.015372,   0.010157,  -0.034182,  -0.037453,  -0.036060,    0.037453,    -0.005837,
-  //    0.015469,  -0.003856,  -0.029304,   0.052425,  -0.017910,  -0.124694,  -0.070971,    0.124694,     0.114063,
-  //    0.003343,  -0.001598,  -0.017875,   0.008649,  -0.034542,  -0.031420,  -0.033724,    0.031420,    -0.013374,
-  //    0.014198,  -0.003726,  -0.039106,   0.064256,  -0.010398,  -0.140364,  -0.081399,    0.140364,     0.113799,
-  //    0.010418,  -0.003566,  -0.013914,   0.010963,  -0.032107,  -0.019283,  -0.025475,    0.019283,    -0.013915,
-  //   -0.008654,   0.002118,  -0.025727,   0.012365,   0.019616,  -0.066554,  -0.072897,    0.066554,     0.030760,
-  //    0.003498,  -0.001276,   0.008843,  -0.014071,  -0.032046,   0.041551,  -0.005429,   -0.041551,    -0.032057,
-  //   -0.011032,   0.002679,  -0.036220,   0.019256,   0.017551,  -0.098034,  -0.091957,    0.098034,     0.055597,
-  //    0.004048,  -0.001544,   0.010157,  -0.015372,  -0.034182,   0.037453,  -0.006969,   -0.037453,    -0.036057,
-  //   -0.015469,   0.003856,  -0.052425,   0.029304,   0.017910,  -0.124694,  -0.114055,    0.124694,     0.070974,
-  //    0.003343,  -0.001598,   0.008649,  -0.017875,  -0.034542,   0.031420,  -0.012945,   -0.031420,    -0.033711,
-  //   -0.014198,   0.003726,  -0.064256,   0.039106,   0.010398,  -0.140364,  -0.113929,    0.140364,     0.081385,
-  //    0.010418,  -0.003566,   0.010963,  -0.013914,  -0.032107,   0.019283,  -0.013573,   -0.019283,    -0.025460,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-  //    0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000;
-  //
-  //    T << 1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000,
-  //         1.000000,  0.000000,
-  //         0.000000,  1.000000;
-  //
-  // T = (1.0/pow(23.0, 0.5))*T;
-  //
-  // JacobiSVD<MatrixXd> svd( U, ComputeFullV | ComputeFullU );
-  // svddiag = svd.matrixU();
-  // svddiag.conservativeResize(svddiag.rows(),9);
-  //
-  // intermediate.col(0) = T.col(0);
-  // intermediate.col(1) = T.col(1);
-  // for(int i = 2; i < 11; i++)
-  // {
-  //   intermediate.col(i) = svddiag.col(i - 2) - (T.col(0).transpose()*svddiag.col(i - 2))*T.col(0);
-  //   intermediate.col(i) = intermediate.col(i) - (T.col(1).transpose()*intermediate.col(i))*T.col(1);
-  // }
-  //
-  // _U = intermediate;
-  //
-  // U.resize(0,0);
-  // T.resize(0,0);
   _U = U;
 }
 
@@ -490,7 +337,7 @@ void TRIANGLE_MESH::stepShearTest(const Real shear)
   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
   {
     int right = _constrainedVertices[x];
-    if (_restVertices[right][1] > -.35)
+    if (_restVertices[right][1] > -.95)
       _vertices[right][0] += shear;
   }
 }
@@ -786,6 +633,48 @@ void TRIANGLE_MESH::computeMaterialForces()
 
 }
 
+void TRIANGLE_MESH::computeUnprecomputedMaterialForces()
+{
+  //the global vector will be v= [f_0, f_1 ...] where each f_i = [x,y] (column vectors)
+  //and forces are only for unconstrained vertices. This means the size of this vector is
+  // size(unconstrained vertices)*2 since each has an x,y component
+  VECTOR global_vector(_unconstrainedVertices.size()*2);
+  global_vector.setZero();
+
+  //loop through triangles, calculate force on each local point
+  //convert local vertices to global vertex
+  //add force computed into global vertex spot of global_vector
+  int n_of_triangles = _triangles.size();
+
+  for(int x = 0; x < n_of_triangles; x++)
+  {
+    //get our current triangle
+    TRIANGLE current = getTriangle(x);
+
+    //find the force vector that's being applied to this triangle
+    VECTOR current_force = current.computeForceVector();
+
+    //add the forces into the right place in the global force vector
+    for(int y = 0; y < 3; y++)
+    {
+      //get current triangle vertex y
+      VEC2* current_v = _triangles[x].vertex(y);
+
+      //if the vertex we're on is unconstrained, add it to the global vector
+      if(_vertexToIndex.find(current_v) != _vertexToIndex.end())
+      {
+        //find the global index using the vertexToIndex map
+        int global_index = _vertexToIndex[current_v];
+        global_vector[global_index] += current_force[2*y];
+        global_vector[global_index + 1] += current_force[2*y + 1];
+      }
+    }
+  }
+
+  //store global vector into _f
+  _f = global_vector;
+}
+
 void TRIANGLE_MESH::wackyCollision()
 {
   float kw = 100; // spring constant of wall
@@ -891,7 +780,7 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
   // Newton Raphson Iteration, but j-max is 1 so no need to write the loop
   //step 1: compute K
   K.setZero();
-  computeStiffnessMatrix(K);
+  computeUnprecomputedStiffnessMatrix(K);
 
   // step 2: compute D
   D = alpha*_mass - beta*K;
@@ -902,7 +791,7 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
   // VECTOR reducedF = _U.transpose() * _fExternal;
 
   // step 4: compute R(q+1)
-  computeMaterialForces();
+  computeUnprecomputedMaterialForces();
 
   // step 5: calculate a1 - a6 with beta  0.25 and gamma = 0.5
   float betat = 0.25;
@@ -958,15 +847,16 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
 bool TRIANGLE_MESH::stepQuasistatic()
 {
   //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
-  MATRIX K(_u.size(),_u.size());
+  MATRIX K(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
+  // MATRIX K(_u.size(),_u.size());
   // MATRIX K(_q.size(),_q.size());
 
   //step 1: compute K
   K.setZero();
-  computeStiffnessMatrix(K);
+  computeUnprecomputedStiffnessMatrix(K);
 
   //step 2: compute internal material forces, R(uq)
-  computeMaterialForces();
+  computeUnprecomputedMaterialForces();
 
   // //step 3: external forces transform
   // VECTOR reducedF = _U.transpose() * _fExternal;
@@ -978,6 +868,9 @@ bool TRIANGLE_MESH::stepQuasistatic()
   //step 5: compute x = K .inverse().eval()  * r
   MATRIX inverse2 = K.inverse().eval();
   VECTOR x2 = inverse2*r2;
+
+  // printf("inverse:\n");
+  // printMatrix(inverse2);
 
   //step 6: add solution x to displamcement vector _u
   _u += x2;
@@ -992,7 +885,7 @@ bool TRIANGLE_MESH::stepQuasistatic()
   _f.setZero();
 
   static int counter = 0;
-  cout << " Quasistatic step: " << counter << endl;
+  // cout << " Quasistatic step: " << counter << endl;
   counter++;
   return true;
 }
@@ -1019,4 +912,48 @@ void TRIANGLE_MESH::computeStiffnessMatrix(MATRIX& K)
 
   // free space
   temp.clear();
+}
+
+void TRIANGLE_MESH::computeUnprecomputedStiffnessMatrix(MATRIX& K)
+{
+  //can assume K is the correct size, 2V x 2V
+
+  int n_of_triangles = _triangles.size();
+
+  //go through each triangle and map vertices to their global vertices. if
+  //unrestrained, then add to the poisition in the global K.
+  for(int x = 0; x < n_of_triangles; x++)
+  {
+    TRIANGLE current = getTriangle(x);
+
+    //find the force vector that's being applied to this triangle
+    MATRIX current_force = current.computeForceJacobian();
+
+    for(int i = 0; i < 3; i++)
+    {
+      //get current triangle vertex y
+      VEC2* current_iv = _triangles[x].vertex(i);
+
+      //if the vertex we're on is unconstrained, add it to the global K
+      if(_vertexToIndex.find(current_iv) != _vertexToIndex.end())
+      {
+        //find the global index using the vertexToIndex map
+        int global_index_i = _vertexToIndex[current_iv];
+
+        for(int j = 0; j < 3; j++)
+        {
+          VEC2* current_jv = _triangles[x].vertex(j);
+
+          if(_vertexToIndex.find(current_jv) != _vertexToIndex.end())
+          {
+            int global_index_j = _vertexToIndex[current_jv];
+            K(global_index_i, global_index_j) += current_force(2*i, 2*j);
+            K(global_index_i, global_index_j + 1) += current_force(2*i, 2*j + 1);
+            K(global_index_i + 1, global_index_j) += current_force(2*i + 1, 2*j);
+            K(global_index_i + 1, global_index_j + 1) += current_force(2*i + 1, 2*j + 1);
+          }
+        }
+      }
+    }
+  }
 }

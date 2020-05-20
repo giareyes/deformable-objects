@@ -38,7 +38,7 @@ public:
   TENSOR4 getCubic() { return _cubicCoef; };
   TENSOR4 getQuad() { return _quadraticCoef; };
 
-  vector<MATRIX> computeForceJacobian();
+  MATRIX computeForceJacobian();
 
   VECTOR computeForceVector();
 

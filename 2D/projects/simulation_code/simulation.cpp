@@ -36,6 +36,7 @@ int mouseModifiers = -1;
 // animate the current runEverytime()?
 bool animate = false;
 bool singleStep = false;
+bool createBasis = false;
 // float dt = 1.0/15360.0;
 float dt = 1.0/100.0;
 
@@ -49,6 +50,7 @@ float zoom = 2.0;
 // old:
 Real poissonsRatio = 0.4;
 Real youngsModulus = 1.0;
+int basisCols = 0;
 
 // testing:
 // Real poissonsRatio = 0.4;
@@ -239,28 +241,42 @@ void glutMouseMotion(int x, int y)
   float xDiff = x - xMouse;
   float yDiff = y - yMouse;
 
+  // printf("xDiff: %f\n", xDiff);
+
   if (mouseButton == GLUT_LEFT_BUTTON)
   {
-    double screenX = ((double) x / 400.0) - 0.09;
-    double screenY = ((double) (800 - y) / 400.0) - 0.35;
-    double mouseX = ((double) xMouse / 400.0) - 0.09;
-    double mouseY = ((double) (800 - yMouse) / 400.0) - 0.35;
+    // printf("x %f\n", x);
+    // printf("y %f\n", y);
+    double screenX = ((double) x/ 400.0) - 1;
+    double screenY = ((double) (800 - y) / 400.0) - 1;
+    double mouseX = ((double) xMouse / 400.0) - 1;
+    double mouseY = ((double) (800 - yMouse) / 400.0) - 1;
+
+    // printf("screenx %f\n", screenX);
+    // printf("screeny %f\n\n\n", screenY);
 
     if (sceneNum == 1)
     {
+      // printf("if\n");
       for (int i = 0; i < unconstrainedVertices.size(); i++)
       {
+        // printf("vertex %d: (%f,%f)\n", i, vertices[unconstrainedVertices[i]][0], vertices[unconstrainedVertices[i]][1]);
         if (screenX <= vertices[unconstrainedVertices[i]][0] + 0.04
           && screenX >= vertices[unconstrainedVertices[i]][0] - 0.04
           && screenY <= vertices[unconstrainedVertices[i]][1] + 0.03
           && screenY >= vertices[unconstrainedVertices[i]][1] - 0.03)
         {
+          printf("addforce\n");
+          printf("vertex %d: (%f,%f)\n", i, vertices[unconstrainedVertices[i]][0], vertices[unconstrainedVertices[i]][1]);
+          printf("screenx %f\n", screenX);
+          printf("screeny %f\n\n\n", screenY);
           triangleMesh.addSingleForce(VEC2(xDiff, -1*yDiff), unconstrainedVertices[i]);
         }
       }
     }
     else
     {
+      printf("else\n");
       for (int i = 0; i < vertices.size(); i++)
       {
         if (screenX <= vertices[i][0] + 0.04
@@ -268,6 +284,7 @@ void glutMouseMotion(int x, int y)
           && screenY <= vertices[i][1] + 0.03
           && screenY >= vertices[i][1] - 0.03)
         {
+          printf("addforce\n");
           triangleMesh.addBodyForce(VEC2(xDiff*2, -1*yDiff*2));
           triangleMesh.addSingleForce(VEC2(xDiff, -1*yDiff), i);
         }
@@ -296,16 +313,16 @@ void glutIdle()
     static int frame = 0;
     switch (scene) {
       case STRETCH:
-        triangleMesh.stretch2(0.01);
+        triangleMesh.stretch2(0.001);
         break;
       case RSHEAR:
-        triangleMesh.stepShearTest(0.01);
+        triangleMesh.stepShearTest(0.001);
         break;
       case LSHEAR:
-        triangleMesh.stepShearTest(-0.01);
+        triangleMesh.stepShearTest(-0.001);
         break;
       case SQUASH:
-        triangleMesh.stretch2(-0.01);
+        triangleMesh.stretch2(-0.001);
         break;
       case SINGLE:
         triangleMesh.addBodyForce(bodyForce);
@@ -399,15 +416,15 @@ string toUpper(const string& input)
 ///////////////////////////////////////////////////////////////////////
 void readCommandLine(int argc, char** argv)
 {
-  if (argc < 3)
+  if (argc < 2)
   {
-    cout << " invalid number of arguments. Args given: " << argc << ". need 2 filenames" << endl;
+    cout << " invalid number of arguments. Args given: " << argc << ". need filenames" << endl;
     exit(0);
   }
 
-  if (argc > 3)
+  if (argc > 2)
   {
-    string sceneType(argv[3]);
+    string sceneType(argv[2]);
     sceneType = toUpper(sceneType);
 
     if (sceneType.compare("LSHEAR") == 0)
@@ -426,14 +443,20 @@ void readCommandLine(int argc, char** argv)
       sceneNum = 0;
     }
 
-    if (argc > 4)
+    if (argc > 3)
     {
-      for(int x = 4; x < argc; x++)
+      for(int x = 3; x < argc; x++)
       {
         if (argv[x][1] == 'm')
           meshFlag = 1;
         else if (argv[x][1] == 'b')
           sceneNum = 1;
+        else if (argv[x][1] == 'q')
+        {
+          createBasis = true;
+          basisCols = stoi(argv[x+1]);
+          x++;
+        }
       }
     }
   }
@@ -444,7 +467,7 @@ void readCommandLine(int argc, char** argv)
   }
 
   // build the scene
-  triangleMesh.buildBlob(1.15, sceneNum, argv[1], argv[2]);
+  triangleMesh.buildBlob(1.15, sceneNum, argv[1]);
   bodyForce[0] = 0;
   bodyForce[1] = -0.3;
 
@@ -458,7 +481,7 @@ void readCommandLine(int argc, char** argv)
 ///////////////////////////////////////////////////////////////////////
 int main(int argc, char** argv)
 {
-  cout << " Usage: " << argv[0] << "<vertex filename> <vertex filename> <which scene> <extra args>" << endl;
+  cout << " Usage: " << argv[0] << "<vertex filename> <which scene> <extra args>" << endl;
   cout << "\t Valid values: " << endl;
   cout << "\t\t <which test>: SINGLE, LSHEAR, RSHEAR, SQUASH, STRETCH, MOTION" << endl;
 

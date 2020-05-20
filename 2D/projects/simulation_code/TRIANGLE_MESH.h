@@ -18,7 +18,7 @@ public:
   // add walls
   void addWall(const WALL& wall)             { _walls.push_back(wall); };
   // build the different kinds of tests
-  void buildBlob(const Real xPos, int sceneNum, const char* file_nodes, const char* file_triangles);
+  void buildBlob(const Real xPos, int sceneNum, const char* file_nodes);
 
   bool stepQuasistatic();
 
@@ -80,10 +80,14 @@ private:
 
   void computeMaterialForces();
 
+  void computeUnprecomputedMaterialForces();
+
   // rebuild the vertex-to-index lookup
   void computeVertexToIndexTable();
 
   void computeStiffnessMatrix(MATRIX& K);
+
+  void computeUnprecomputedStiffnessMatrix(MATRIX& K);
 
   // how many degrees of freedom are there?
   int _DOFs;
