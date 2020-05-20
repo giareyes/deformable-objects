@@ -23,7 +23,7 @@ TRIANGLE_MESH::~TRIANGLE_MESH()
   delete _material;
 }
 
-void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_nodes)
+void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_basis, int cols)
 {
   _vertices.clear();
   _triangles.clear();
@@ -32,12 +32,12 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
   int vertCount;
   int size;
 
-  string nodeFile = file_nodes + string(".node");
+  string nodeFile = filename + string(".node");
   std::ifstream nodes(nodeFile);
 
   if (nodes.is_open())
   {
-    printf("nodes open\n");
+    // printf("nodes open\n");
     std::string line;
 
     //get first line
@@ -46,10 +46,13 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
     // split first line
     std::istringstream iss(line);
 
-    if(iss >> vertCount >> size) // this line inside the if statement stores the values
+    if(!(iss >> vertCount >> size)) // this line inside the if statement stores the values
     {
-      printf("vertices: %d\n", vertCount);
-      printf("size: %d\n", size);
+      cout << "error: issue with file format" << endl;
+      nodes.close();
+      exit(0);
+      // printf("vertices: %d\n", vertCount);
+      // printf("size: %d\n", size);
     }
 
     // we are only dealing with 2d now, but maybe we want to keep the option open for 3d implementation
@@ -106,7 +109,7 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
       }
     }
 
-    printf("size of vertex array is: %lu\n", _vertices.size());
+    // printf("size of vertex array is: %lu\n", _vertices.size());
   }
   else // error! shut down
   {
@@ -118,12 +121,12 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
   nodes.close();
 
   // open the file with the triangle verts!!
-  nodeFile = file_nodes + string(".ele");
+  nodeFile = filename + string(".ele");
   std::ifstream polys(nodeFile);
 
   if (polys.is_open())
   {
-    printf("polys open\n");
+    // printf("polys open\n");
     std::string line;
     int numTri; // the number of triangles we are creating
     int numVert; // we need to make sure we are actually given 3 verts for a triangle
@@ -134,10 +137,13 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
     // split first line
     std::istringstream iss(line);
 
-    if(iss >> numTri >> numVert) // this line inside the if statement stores the values
+    if(!(iss >> numTri >> numVert)) // this line inside the if statement stores the values
     {
-      printf("triangles: %d\n", numTri);
-      printf("size: %d\n", numVert);
+      cout << "error: issue with file format" << endl;
+      polys.close();
+      exit(0);
+      // printf("triangles: %d\n", numTri);
+      // printf("size: %d\n", numVert);
     }
 
     // this program is triangles only!!
@@ -185,15 +191,19 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
   }
 
   polys.close();
-  printf("file open/close success\n");
+  // printf("file open/close ssuccess\n");
 
   // allocate the state vectors
   _DOFs = 2 * (_vertices.size() - _constrainedVertices.size());
 
   if (sceneNum)
   {
-    basisNoTranslation();
     size = _unconstrainedVertices.size()*2;
+    if(!create_basis)
+    {
+      basisNoTranslation(filename, cols);
+      size = _vertices.size()*2;
+    }
   }
   else
   {
@@ -207,23 +217,25 @@ void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum, const char* file_no
   VECTOR z2(_U.cols());
 
   z2.setZero();
-
   zeros.setZero();
+
+  // if(create_basis)
   _u            = zeros;
   _q            = z2;
   // _ra           = z2;
   // _rv           = z2;
   // _f            = z2;
-  _f            = zeros;
-  _ra           = zeros;
-  _rv           = zeros;
+  _f            = z2;
+  _ra           = z2;
+  _rv           = z2;
   _fExternal    = zeros;
   _acceleration = zeros;
   _velocity     = zeros;
 
   // compute the reverse lookup
   computeVertexToIndexTable();
-  // createCoefs();
+  if(!create_basis)
+    createCoefs();
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -284,10 +296,30 @@ void TRIANGLE_MESH::setMassMatrix()
   _mass = M;
 }
 
-void TRIANGLE_MESH::basisNoTranslation()
+void TRIANGLE_MESH::basisNoTranslation(const char* filename, int basis_cols)
 {
-  MATRIX U(46,9);
-  _U = U;
+  FILE* file = NULL;
+  int rows;
+  int cols;
+  string readin = filename + string(".basis");
+  file = fopen(readin.c_str(), "r");
+  fscanf(file, "%i %i", &rows, &cols);
+  MATRIX U(rows, cols);
+  MATRIX svddiag(rows, basis_cols);
+  for(int i = 0; i < rows; i++)
+  {
+    for(int j = 0; j < cols; j++)
+      fscanf(file, "%lf", &U(i,j));
+  }
+
+  fclose(file);
+
+  JacobiSVD<MatrixXd> svd( U, ComputeFullV | ComputeFullU );
+   svddiag = svd.matrixU();
+   svddiag.conservativeResize(svddiag.rows(), basis_cols);
+   _U = svddiag;
+
+  printMatrix(_U);
 }
 
 void TRIANGLE_MESH::setBasisReduction()
@@ -532,67 +564,67 @@ void TRIANGLE_MESH::createCoefs()
   }
 
   // reduction matrix
-  // MATRIX transpose = _U.transpose();
+  MATRIX transpose = _U.transpose();
 
   // set reduced coefficients for the cubic polynomial
 
   // linear term
-  _linearCoef = m;
+  // _linearCoef = m;
 
   // if reduced:
-  // _linearCoef = transpose*(m*_U);
-  // m.resize(0,0);
+  _linearCoef = transpose*(m*_U);
+  m.resize(0,0);
 
 
   // cubic coefficient
-  _cubicCoef = temp;
+  // _cubicCoef = temp;
 
   // if reduced:
-  // _cubicCoef = temp.modeFourProduct(transpose);
-  // temp.clear();
-  // _cubicCoef = _cubicCoef.modeThreeProduct(transpose);
-  // _cubicCoef = _cubicCoef.modeTwoProduct(transpose);
-  // _cubicCoef = _cubicCoef.modeOneProduct(transpose);
+  _cubicCoef = temp.modeFourProduct(transpose);
+  temp.clear();
+  _cubicCoef = _cubicCoef.modeThreeProduct(transpose);
+  _cubicCoef = _cubicCoef.modeTwoProduct(transpose);
+  _cubicCoef = _cubicCoef.modeOneProduct(transpose);
 
   // quadratic coefficient of cubic polynomial
-  _cubicquad = cubq;
+  // _cubicquad = cubq;
 
   // if reduced:
-  // _cubicquad = cubq.modeThreeProduct(transpose);
-  // cubq.clear();
-  // _cubicquad = _cubicquad.modeTwoProduct(transpose);
-  // _cubicquad = _cubicquad.modeOneProduct(transpose);
+  _cubicquad = cubq.modeThreeProduct(transpose);
+  cubq.clear();
+  _cubicquad = _cubicquad.modeTwoProduct(transpose);
+  _cubicquad = _cubicquad.modeOneProduct(transpose);
 
   // set reduced coefficients for quadratic polynomial
 
   // constant term
-  _constCoef = constTemp;
-  // _constCoef = transpose*(constTemp*_U);
+  // _constCoef = constTemp;
+  _constCoef = transpose*(constTemp*_U);
 
   // linear term
-  _quadlinear = quadl;
+  // _quadlinear = quadl;
 
   // if reduced:
-  // _quadlinear = quadl.modeThreeProduct(transpose);
-  // quadl.clear();
-  // _quadlinear = _quadlinear.modeTwoProduct(transpose);
-  // _quadlinear = _quadlinear.modeOneProduct(transpose);
+  _quadlinear = quadl.modeThreeProduct(transpose);
+  quadl.clear();
+  _quadlinear = _quadlinear.modeTwoProduct(transpose);
+  _quadlinear = _quadlinear.modeOneProduct(transpose);
 
   // quadratic term
-  _quadraticCoef = tempQuad;
+  // _quadraticCoef = tempQuad;
 
   // if reduced:
-  // _quadraticCoef = tempQuad.modeFourProduct(transpose);
-  // tempQuad.clear();
-  // _quadraticCoef = _quadraticCoef.modeThreeProduct(transpose);
-  // _quadraticCoef = _quadraticCoef.modeTwoProduct(transpose);
-  // _quadraticCoef = _quadraticCoef.modeOneProduct(transpose);
+  _quadraticCoef = tempQuad.modeFourProduct(transpose);
+  tempQuad.clear();
+  _quadraticCoef = _quadraticCoef.modeThreeProduct(transpose);
+  _quadraticCoef = _quadraticCoef.modeTwoProduct(transpose);
+  _quadraticCoef = _quadraticCoef.modeOneProduct(transpose);
 
   // free memory if reduced
-  // transpose.resize(0,0);
-  // temp.clear();
-  // cubq.clear();
-  // m.resize(0,0);
+  transpose.resize(0,0);
+  temp.clear();
+  cubq.clear();
+  m.resize(0,0);
 
 }
 ///////////////////////////////////////////////////////////////////////
@@ -604,8 +636,8 @@ void TRIANGLE_MESH::computeMaterialForces()
   //the global vector will be v= [f_0, f_1 ...] where each f_i = [x,y] (column vectors)
   //and forces are only for unconstrained vertices. This means the size of this vector is
 
-  // VECTOR displacement = _q;
-  VECTOR displacement = _u;
+  VECTOR displacement = _q;
+  // VECTOR displacement = _u;
 
   VECTOR global_vector(displacement.size());
   global_vector.setZero();
@@ -730,68 +762,67 @@ void TRIANGLE_MESH::checkCollision()
   float kw = 100; // spring constant of wall
   float l = 0.1; // dampening force constant
 
-  for(unsigned int y = 0; y < _walls.size(); y++)
-  {
-    for(int x = 0; x < _vertices.size(); x++ )
-    {
-      float diffx;
-      if(_walls[y].point()[0] > 0)
-        diffx = _walls[y].point()[0] - (_vertices[x][0]);
-      else
-        diffx = _walls[y].point()[0] - (_vertices[x][0]);
+  // for(unsigned int y = 0; y < _walls.size(); y++)
+  // {
+  //   for(int x = 0; x < _vertices.size(); x++ )
+  //   {
+  //     float diffx;
+  //     if(_walls[y].point()[0] > 0)
+  //       diffx = _walls[y].point()[0] - (_vertices[x][0]);
+  //     else
+  //       diffx = _walls[y].point()[0] - (_vertices[x][0]);
+  //
+  //     float diffy =  _walls[y].point()[1] - (_vertices[x][1]);
+  //
+  //     if((diffx >= 0 && _walls[y].point()[0] < 0) || (diffx <= 0 && _walls[y].point()[0] > 0) ) //did it hit a side wall?
+  //     {
+  //       addBodyForce( kw * abs(diffx) * _walls[y].normal() ); //apply spring force of wall
+  //       addBodyForce( l * _velocity[2*x] * _walls[y].normal() ); //apply dampening force
+  //       addSingleForce(abs(diffx) * _walls[y].normal(), x);
+  //       break;
+  //     }
+  //     if(diffy >= 0 && _walls[y].point()[1] != 0) // did it hit the floor?
+  //     {
+  //         addBodyForce( kw * diffy * _walls[y].normal() ); //apply spring force of wall
+  //         addBodyForce( l * _velocity[2*x + 1] * _walls[y].normal() ); //apply dampening force
+  //         addSingleForce(abs(diffy) * _walls[y].normal(), x);
+  //         break;
+  //     }
+  //   }
+  // }
 
-      float diffy =  _walls[y].point()[1] - (_vertices[x][1]);
-
-      if((diffx >= 0 && _walls[y].point()[0] < 0) || (diffx <= 0 && _walls[y].point()[0] > 0) ) //did it hit a side wall?
-      {
-        addBodyForce( kw * abs(diffx) * _walls[y].normal() ); //apply spring force of wall
-        addBodyForce( l * _velocity[2*x] * _walls[y].normal() ); //apply dampening force
-        addSingleForce(abs(diffx) * _walls[y].normal(), x);
-        break;
-      }
-      if(diffy >= 0 && _walls[y].point()[1] != 0) // did it hit the floor?
-      {
-          addBodyForce( kw * diffy * _walls[y].normal() ); //apply spring force of wall
-          addBodyForce( l * _velocity[2*x + 1] * _walls[y].normal() ); //apply dampening force
-          addSingleForce(abs(diffy) * _walls[y].normal(), x);
-          break;
-      }
-    }
-  }
 }
 
 // motion step using Euler Lagrange
 void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
 {
   //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
-  MATRIX K(_u.size(),_u.size() );
-  MATRIX D(_u.size(),_u.size() );
+  // MATRIX K(_u.size(),_u.size() );
+  // MATRIX D(_u.size(),_u.size() );
 
   //reduced
-  // MATRIX K(_q.size(),_q.size() );
-  // MATRIX D(_q.size(),_q.size() );
+  MATRIX K(_q.size(),_q.size() );
+  MATRIX D(_q.size(),_q.size() );
 
   MATRIX inverse;
   float alpha = 0.01; // constant for damping
   float beta = 0.02;  // constant for damping
 
   checkCollision();
-
   // Newton Raphson Iteration, but j-max is 1 so no need to write the loop
   //step 1: compute K
   K.setZero();
-  computeUnprecomputedStiffnessMatrix(K);
+  computeStiffnessMatrix(K);
 
   // step 2: compute D
   D = alpha*_mass - beta*K;
 
-
   // step 3: calculate f_external
-  VECTOR reducedF = _fExternal;
-  // VECTOR reducedF = _U.transpose() * _fExternal;
+  // VECTOR reducedF = _fExternal;
+  VECTOR reducedF = _U.transpose() * _fExternal;
 
   // step 4: compute R(q+1)
-  computeUnprecomputedMaterialForces();
+  computeMaterialForces();
 
   // step 5: calculate a1 - a6 with beta  0.25 and gamma = 0.5
   float betat = 0.25;
@@ -815,9 +846,9 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
   inverse.resize(0,0);
 
   // step 7: update q and u
-  _u += dq;
-  // _q += dq;
-  // qTou();
+  // _u += dq;
+  _q += dq;
+  qTou();
 
   // step 8: update all node positions w new displacement vector
   int unconstrained = _unconstrainedVertices.size();
@@ -835,8 +866,8 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
   VECTOR newVel = a4*dq + a5*_rv + a6*_ra;
   _ra = a1*dq - a2*_rv - a3*_ra;
   _rv = newVel;
-  // _velocity = _U*_rv;
-  _velocity = _rv;
+  _velocity = _U*_rv;
+  // _velocity = _rv;
 
   _fExternal.setZero();
   _f.setZero();
@@ -883,10 +914,11 @@ bool TRIANGLE_MESH::stepQuasistatic()
   //reset forces to 0
   _fExternal.setZero();
   _f.setZero();
+  K.resize(0,0);
 
-  static int counter = 0;
+  // static int counter = 0;
   // cout << " Quasistatic step: " << counter << endl;
-  counter++;
+  // counter++;
   return true;
 }
 
@@ -897,8 +929,8 @@ void TRIANGLE_MESH::computeStiffnessMatrix(MATRIX& K)
 {
   //can assume K is the correct size, 2V x 2V
 
-  // VECTOR displacement = _q;
-  VECTOR displacement = _u;
+  VECTOR displacement = _q;
+  // VECTOR displacement = _u;
 
   // compute quadratic term and add to K
   TENSOR3 temp = _quadraticCoef.modeFourProduct(displacement);

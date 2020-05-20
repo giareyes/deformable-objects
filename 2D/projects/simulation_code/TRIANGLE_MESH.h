@@ -18,7 +18,7 @@ public:
   // add walls
   void addWall(const WALL& wall)             { _walls.push_back(wall); };
   // build the different kinds of tests
-  void buildBlob(const Real xPos, int sceneNum, const char* file_nodes);
+  void buildBlob(int sceneNum, const char* filename, bool create_basis, int cols);
 
   bool stepQuasistatic();
 
@@ -32,7 +32,7 @@ public:
   // set U
   void setBasisReduction();
 
-  void basisNoTranslation();
+  void basisNoTranslation(const char* filename, int basis_cols);
 
   void uToq();
 
@@ -68,6 +68,7 @@ public:
   std::vector<VEC2>& vertices() { return _vertices; };
   std::vector<int>& unconstrainedVertices() { return _unconstrainedVertices; };
   void setDisplacement(int index, float d) { _u[index] = d; };
+  VECTOR getDisplacement() {return _u; };
   const std::vector<int>& constrainedVertices() { return _constrainedVertices; };
   vector<WALL>& walls() { return _walls; };
 

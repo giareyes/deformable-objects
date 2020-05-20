@@ -1,6 +1,7 @@
 #include "SETTINGS.h"
 #include <cmath>
 #include <iostream>
+#include <fstream>
 #include <vector>
 
 #if _WIN32
@@ -313,16 +314,16 @@ void glutIdle()
     static int frame = 0;
     switch (scene) {
       case STRETCH:
-        triangleMesh.stretch2(0.001);
+        triangleMesh.stretch2(0.002);
         break;
       case RSHEAR:
-        triangleMesh.stepShearTest(0.001);
+        triangleMesh.stepShearTest(0.002);
         break;
       case LSHEAR:
-        triangleMesh.stepShearTest(-0.001);
+        triangleMesh.stepShearTest(-0.002);
         break;
       case SQUASH:
-        triangleMesh.stretch2(-0.001);
+        triangleMesh.stretch2(-0.002);
         break;
       case SINGLE:
         triangleMesh.addBodyForce(bodyForce);
@@ -348,7 +349,6 @@ void glutIdle()
     }
     else
     {
-      printf("else\n");
       triangleMesh.stepQuasistatic();
     }
     frame++;
@@ -454,6 +454,11 @@ void readCommandLine(int argc, char** argv)
         else if (argv[x][1] == 'q')
         {
           createBasis = true;
+          if( x + 1 == argc )
+          {
+            cout << " invalid number of arguments. Need an int after the -q flag" << endl;
+            exit(0);
+          }
           basisCols = stoi(argv[x+1]);
           x++;
         }
@@ -466,8 +471,62 @@ void readCommandLine(int argc, char** argv)
     sceneNum = 0;
   }
 
+  // if we are creating a basis, we must create a file with all of the deformations we will be using
+  if(createBasis)
+  {
+    FILE* file = NULL;
+    int nVerts;
+    string filename = argv[1] + string(".node");
+    file = fopen(filename.c_str(), "r");
+    fscanf(file, "%i", &nVerts);
+    fclose(file);
+
+    filename = argv[1] + string(".basis");
+    file = fopen(filename.c_str(), "w");
+    fprintf(file, "%i %i\n", nVerts*2, 60);
+
+    for(int i = 0; i < 4; i++)
+    {
+      printf("test %i\n", i);
+      TRIANGLE_MESH basisBuild(poissonsRatio, youngsModulus);
+      basisBuild.buildBlob(1, argv[1], true, 0);
+      bodyForce[0] = 0;
+      bodyForce[1] = -0.3;
+      for(int j = 0; j < 15; j++)
+      {
+        switch(i) {
+          case 0:
+            basisBuild.stretch2(0.002);
+            break;
+          case 1:
+            basisBuild.stepShearTest(0.002);
+            break;
+          case 2:
+            basisBuild.stepShearTest(-0.002);
+            break;
+          case 3:
+            basisBuild.stretch2(-0.002);
+            break;
+        }
+        basisBuild.stepQuasistatic();
+        VECTOR displacements = basisBuild.getDisplacement();
+        int u_size = displacements.size();
+        // printf("nverts %i, all verts %i\n", u_size, nVerts);
+
+        for(int k = 0; k < u_size; k++)
+          fprintf(file, "%lf ", displacements[k]);
+
+        for(int k = 0; k < (nVerts*2) - u_size; k++)
+          fprintf(file, "%lf ", 0.00);
+
+        fprintf(file, "\n");
+      }
+    }
+    fclose(file);
+  }
+
   // build the scene
-  triangleMesh.buildBlob(1.15, sceneNum, argv[1]);
+  triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
   bodyForce[0] = 0;
   bodyForce[1] = -0.3;
 
