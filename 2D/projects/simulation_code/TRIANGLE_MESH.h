@@ -24,10 +24,10 @@ public:
 
 //----------------------------------------------------------
   // Euler's equation of motion
-  void stepMotion(float dt, const VEC2& outerForce);
+  void stepMotion(float dt, const VEC2& outerForce, int sceneNum);
 
   // regular equation of motion
-  void setMassMatrix();
+  void setMassMatrix(bool reduction);
 
   // set U
   void setBasisReduction();

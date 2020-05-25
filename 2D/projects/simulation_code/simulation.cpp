@@ -344,7 +344,7 @@ void glutIdle()
         {
           triangleMesh.addBodyForce(bodyForce);
         }
-        triangleMesh.stepMotion(dt, bodyForce);
+        triangleMesh.stepMotion(dt, bodyForce, sceneNum);
       }
     }
     else

@@ -211,7 +211,9 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
     size = _vertices.size()*2;
   }
 
-  setMassMatrix();
+  setMassMatrix(!create_basis);
+
+  // printf("vertices: %d\n", _vertices.size());
 
   VECTOR zeros(size);
   VECTOR z2(_U.cols());
@@ -283,7 +285,7 @@ void TRIANGLE_MESH::uGather()
   }
 }
 
-void TRIANGLE_MESH::setMassMatrix()
+void TRIANGLE_MESH::setMassMatrix(bool reduction)
 {
   // matrix of size 2Nx2N
   MATRIX M(_vertices.size()*2,_vertices.size()*2);
@@ -291,8 +293,12 @@ void TRIANGLE_MESH::setMassMatrix()
   //for now we will make every vertex has mass 1
   M.setIdentity();
   M = M*15;
-  // M = M*_U;
-  // M = _U.transpose() * M;
+
+  if (reduction)
+  {
+    M = M*_U;
+    M = _U.transpose() * M;
+  }
   _mass = M;
 }
 
@@ -762,39 +768,39 @@ void TRIANGLE_MESH::checkCollision()
   float kw = 100; // spring constant of wall
   float l = 0.1; // dampening force constant
 
-  // for(unsigned int y = 0; y < _walls.size(); y++)
-  // {
-  //   for(int x = 0; x < _vertices.size(); x++ )
-  //   {
-  //     float diffx;
-  //     if(_walls[y].point()[0] > 0)
-  //       diffx = _walls[y].point()[0] - (_vertices[x][0]);
-  //     else
-  //       diffx = _walls[y].point()[0] - (_vertices[x][0]);
-  //
-  //     float diffy =  _walls[y].point()[1] - (_vertices[x][1]);
-  //
-  //     if((diffx >= 0 && _walls[y].point()[0] < 0) || (diffx <= 0 && _walls[y].point()[0] > 0) ) //did it hit a side wall?
-  //     {
-  //       addBodyForce( kw * abs(diffx) * _walls[y].normal() ); //apply spring force of wall
-  //       addBodyForce( l * _velocity[2*x] * _walls[y].normal() ); //apply dampening force
-  //       addSingleForce(abs(diffx) * _walls[y].normal(), x);
-  //       break;
-  //     }
-  //     if(diffy >= 0 && _walls[y].point()[1] != 0) // did it hit the floor?
-  //     {
-  //         addBodyForce( kw * diffy * _walls[y].normal() ); //apply spring force of wall
-  //         addBodyForce( l * _velocity[2*x + 1] * _walls[y].normal() ); //apply dampening force
-  //         addSingleForce(abs(diffy) * _walls[y].normal(), x);
-  //         break;
-  //     }
-  //   }
-  // }
+  for(unsigned int y = 0; y < _walls.size(); y++)
+  {
+    for(int x = 0; x < _vertices.size(); x++ )
+    {
+      float diffx;
+      if(_walls[y].point()[0] > 0)
+        diffx = _walls[y].point()[0] - (_vertices[x][0]);
+      else
+        diffx = _walls[y].point()[0] - (_vertices[x][0]);
+
+      float diffy =  _walls[y].point()[1] - (_vertices[x][1]);
+
+      if((diffx >= 0 && _walls[y].point()[0] < 0) || (diffx <= 0 && _walls[y].point()[0] > 0) ) //did it hit a side wall?
+      {
+        addBodyForce( kw * abs(diffx) * _walls[y].normal() ); //apply spring force of wall
+        addBodyForce( l * _velocity[2*x] * _walls[y].normal() ); //apply dampening force
+        addSingleForce(abs(diffx) * _walls[y].normal(), x);
+        break;
+      }
+      if(diffy >= 0 && _walls[y].point()[1] != 0) // did it hit the floor?
+      {
+          addBodyForce( kw * diffy * _walls[y].normal() ); //apply spring force of wall
+          addBodyForce( l * _velocity[2*x + 1] * _walls[y].normal() ); //apply dampening force
+          addSingleForce(abs(diffy) * _walls[y].normal(), x);
+          break;
+      }
+    }
+  }
 
 }
 
 // motion step using Euler Lagrange
-void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
+void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
 {
   //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
   // MATRIX K(_u.size(),_u.size() );
@@ -808,7 +814,10 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
   float alpha = 0.01; // constant for damping
   float beta = 0.02;  // constant for damping
 
-  checkCollision();
+  // in barbic, idk if you need to check collision with the wall.
+  if (sceneNum == 0)
+    checkCollision();
+
   // Newton Raphson Iteration, but j-max is 1 so no need to write the loop
   //step 1: compute K
   K.setZero();
