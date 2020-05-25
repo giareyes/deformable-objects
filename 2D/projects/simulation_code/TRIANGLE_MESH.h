@@ -37,9 +37,6 @@ public:
   // set U without translation by reading in a file and num of cols
   void basisNoTranslation(const char* filename, int basis_cols);
 
-  // displacement to reduced coordiantes
-  void uToq();
-
   // reduced coordinates to displacement
   void qTou();
 
@@ -58,7 +55,6 @@ public:
 //----------------------------------------------------------
 
   // a few functions for deforming the model slightly
-  // void stepStretchTest(const Real stretch);
   void stretch2(const Real stretch);
   void stepSquashTest(const Real squash);
   void stepShearTest(const Real stretch);
@@ -122,7 +118,7 @@ private:
   VECTOR _ra; // reduced acceleration
 
   MATRIX _constCoef; // constant matrix for stiffness matrix calculation
-  TENSOR3 _quadlinear; // linear coefficient for stiffness matrix calculation  
+  TENSOR3 _quadlinear; // linear coefficient for stiffness matrix calculation
   TENSOR4 _quadraticCoef; // quadratic coefficient for stiffness matrix calculation
 
   MATRIX _linearCoef; // linear coefficient for internal force calculation

@@ -329,7 +329,7 @@ void TRIANGLE_MESH::basisNoTranslation(const char* filename, int basis_cols)
    svddiag.conservativeResize(svddiag.rows(), basis_cols);
    _U = svddiag;
 
-  printMatrix(_U);
+  // printMatrix(_U);
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -342,7 +342,9 @@ void TRIANGLE_MESH::setBasisReduction()
   _U = U;
 }
 
-//
+///////////////////////////////////////////////////////////////////////
+// Convert reduced coordinates to actual displacement
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::qTou()
 {
   _u = _U * _q;
@@ -393,19 +395,6 @@ void TRIANGLE_MESH::stepShearTest(const Real shear)
       _vertices[right][0] += shear;
   }
 }
-
-// ///////////////////////////////////////////////////////////////////////
-// // advance the constrained nodes for the stretch test
-// ///////////////////////////////////////////////////////////////////////
-// void TRIANGLE_MESH::stepStretchTest(const Real stretch)
-// {
-//   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
-//   {
-//     int right = _constrainedVertices[x];
-//     if (_restVertices[right][0] > 0.15)
-//       _vertices[right][0] += stretch;
-//   }
-// }
 
 ///////////////////////////////////////////////////////////////////////
 // advance the constrained nodes for the stretch test

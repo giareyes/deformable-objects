@@ -242,26 +242,18 @@ void glutMouseMotion(int x, int y)
   float xDiff = x - xMouse;
   float yDiff = y - yMouse;
 
-  // printf("xDiff: %f\n", xDiff);
-
   if (mouseButton == GLUT_LEFT_BUTTON)
   {
-    // printf("x %f\n", x);
-    // printf("y %f\n", y);
+    // convert screen coordinates to simulation coordinates
     double screenX = ((double) x/ 400.0) - 1;
     double screenY = ((double) (800 - y) / 400.0) - 1;
     double mouseX = ((double) xMouse / 400.0) - 1;
     double mouseY = ((double) (800 - yMouse) / 400.0) - 1;
 
-    // printf("screenx %f\n", screenX);
-    // printf("screeny %f\n\n\n", screenY);
-
     if (sceneNum == 1)
     {
-      // printf("if\n");
       for (int i = 0; i < unconstrainedVertices.size(); i++)
       {
-        // printf("vertex %d: (%f,%f)\n", i, vertices[unconstrainedVertices[i]][0], vertices[unconstrainedVertices[i]][1]);
         if (screenX <= vertices[unconstrainedVertices[i]][0] + 0.04
           && screenX >= vertices[unconstrainedVertices[i]][0] - 0.04
           && screenY <= vertices[unconstrainedVertices[i]][1] + 0.03
