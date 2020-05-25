@@ -472,6 +472,8 @@ void readCommandLine(int argc, char** argv)
   }
 
   // if we are creating a basis, we must create a file with all of the deformations we will be using
+  // im not sure if this if=else statement will be kept later - i think ideally we should always be reducing and
+  // not necessarily creating the basis file ? but this is necessary for now if we want to run quasistatics
   if(createBasis)
   {
     FILE* file = NULL;
@@ -523,10 +525,15 @@ void readCommandLine(int argc, char** argv)
       }
     }
     fclose(file);
+    triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
+  }
+  else
+  {
+    triangleMesh.buildBlob(sceneNum, argv[1], true, 0);
   }
 
   // build the scene
-  triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
+  // triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
   bodyForce[0] = 0;
   bodyForce[1] = -0.3;
 

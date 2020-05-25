@@ -375,7 +375,7 @@ void TRIANGLE_MESH::stepShearTest(const Real shear)
   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
   {
     int right = _constrainedVertices[x];
-    if (_restVertices[right][1] > -.95)
+    if (_restVertices[right][1] > -.85)
       _vertices[right][0] += shear;
   }
 }
@@ -816,7 +816,10 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
 
   // in barbic, idk if you need to check collision with the wall.
   if (sceneNum == 0)
+  {
+    printf("checking collision\n");
     checkCollision();
+  }
 
   // Newton Raphson Iteration, but j-max is 1 so no need to write the loop
   //step 1: compute K
