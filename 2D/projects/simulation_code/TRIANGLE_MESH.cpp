@@ -32,12 +32,12 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
   int vertCount;
   int size;
 
+  // first we will get all the vertices and their coordinates. open the node file.
   string nodeFile = filename + string(".node");
   std::ifstream nodes(nodeFile);
 
   if (nodes.is_open())
   {
-    // printf("nodes open\n");
     std::string line;
 
     //get first line
@@ -51,8 +51,6 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
       cout << "error: issue with file format" << endl;
       nodes.close();
       exit(0);
-      // printf("vertices: %d\n", vertCount);
-      // printf("size: %d\n", size);
     }
 
     // we are only dealing with 2d now, but maybe we want to keep the option open for 3d implementation
@@ -71,7 +69,6 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
         int index;
         double x;
         double y;
-        // int constrained;
 
         // if it doesnt match this format, there's an error
         if(!(iss2 >> index >> x >> y))
@@ -105,11 +102,8 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
         _restVertices[i][1] += (-0.95 - mins[1]);
 
         (_restVertices[i][1] < -0.85 || (_restVertices[i][1] > maxs[1] - 1.05 - mins[1]))? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
-        // (_restVertices[i][1] > maxs[1]- 1.05)? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
       }
     }
-
-    // printf("size of vertex array is: %lu\n", _vertices.size());
   }
   else // error! shut down
   {
@@ -120,13 +114,12 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
   // we are done with the nodes file! close it.
   nodes.close();
 
-  // open the file with the triangle verts!!
+  // open the file with the triangle definitions and create our array of triangles
   nodeFile = filename + string(".ele");
   std::ifstream polys(nodeFile);
 
   if (polys.is_open())
   {
-    // printf("polys open\n");
     std::string line;
     int numTri; // the number of triangles we are creating
     int numVert; // we need to make sure we are actually given 3 verts for a triangle
@@ -142,8 +135,6 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
       cout << "error: issue with file format" << endl;
       polys.close();
       exit(0);
-      // printf("triangles: %d\n", numTri);
-      // printf("size: %d\n", numVert);
     }
 
     // this program is triangles only!!
@@ -191,11 +182,11 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
   }
 
   polys.close();
-  // printf("file open/close ssuccess\n");
 
   // allocate the state vectors
   _DOFs = 2 * (_vertices.size() - _constrainedVertices.size());
 
+  // if this is not a motion sim with translation
   if (sceneNum)
   {
     size = _unconstrainedVertices.size()*2;
@@ -207,21 +198,21 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
   }
   else
   {
+    // this function doesn't actually work - currently motion won't be reduced
     setBasisReduction();
     size = _vertices.size()*2;
   }
 
+  // create the mass matrix
   setMassMatrix(!create_basis);
 
-  // printf("vertices: %d\n", _vertices.size());
-
+  // set all vectors to zero and determine their size
   VECTOR zeros(size);
   VECTOR z2(_U.cols());
 
   z2.setZero();
   zeros.setZero();
 
-  // if(create_basis)
   _u            = zeros;
   _q            = z2;
   // _ra           = z2;
@@ -236,6 +227,8 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
 
   // compute the reverse lookup
   computeVertexToIndexTable();
+
+  // if we aren't creating a basis, then create the tensor coefficients for precomputed method
   if(!create_basis)
     createCoefs();
 }
@@ -262,6 +255,7 @@ void TRIANGLE_MESH::computeVertexToIndexTable()
 }
 
 ///////////////////////////////////////////////////////////////////////
+// set new vertex coordinates by adding displacements
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::uScatter()
 {
@@ -274,6 +268,7 @@ void TRIANGLE_MESH::uScatter()
 }
 
 ///////////////////////////////////////////////////////////////////////
+// set displacements
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::uGather()
 {
@@ -285,6 +280,9 @@ void TRIANGLE_MESH::uGather()
   }
 }
 
+///////////////////////////////////////////////////////////////////////
+// set the mass matrix. If reduction, then multiply by U on both sides
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::setMassMatrix(bool reduction)
 {
   // matrix of size 2Nx2N
@@ -302,6 +300,12 @@ void TRIANGLE_MESH::setMassMatrix(bool reduction)
   _mass = M;
 }
 
+///////////////////////////////////////////////////////////////////////
+// Create a basis matrix with no translation.
+// this is done by reading in a basis file, then performing SVD.
+// the basis file is created by doing multiple quasistatic tests
+// on the unreduced model, then storing displacements.
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::basisNoTranslation(const char* filename, int basis_cols)
 {
   FILE* file = NULL;
@@ -328,17 +332,24 @@ void TRIANGLE_MESH::basisNoTranslation(const char* filename, int basis_cols)
   printMatrix(_U);
 }
 
+///////////////////////////////////////////////////////////////////////
+// Create a basis matrix with translation.
+// NOTE: THIS CURRENTLY DOES NOTHING. IGNORE FOR NOW, REWRITE LATER.
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::setBasisReduction()
 {
   MATRIX U(46,9);
   _U = U;
 }
 
+//
 void TRIANGLE_MESH::qTou()
 {
   _u = _U * _q;
 }
+
 ///////////////////////////////////////////////////////////////////////
+// Add external force to be applied to all vertices
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::addBodyForce(const VEC2& bodyForce)
 {
@@ -349,6 +360,9 @@ void TRIANGLE_MESH::addBodyForce(const VEC2& bodyForce)
   }
 }
 
+///////////////////////////////////////////////////////////////////////
+// Add force to a single vertex
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::addSingleForce(const VEC2& bodyForce, int vertex)
 {
   std::vector<int>::iterator it = std::find(_constrainedVertices.begin(), _constrainedVertices.end(), vertex);
@@ -380,19 +394,22 @@ void TRIANGLE_MESH::stepShearTest(const Real shear)
   }
 }
 
+// ///////////////////////////////////////////////////////////////////////
+// // advance the constrained nodes for the stretch test
+// ///////////////////////////////////////////////////////////////////////
+// void TRIANGLE_MESH::stepStretchTest(const Real stretch)
+// {
+//   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
+//   {
+//     int right = _constrainedVertices[x];
+//     if (_restVertices[right][0] > 0.15)
+//       _vertices[right][0] += stretch;
+//   }
+// }
+
 ///////////////////////////////////////////////////////////////////////
 // advance the constrained nodes for the stretch test
 ///////////////////////////////////////////////////////////////////////
-void TRIANGLE_MESH::stepStretchTest(const Real stretch)
-{
-  for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
-  {
-    int right = _constrainedVertices[x];
-    if (_restVertices[right][0] > 0.15)
-      _vertices[right][0] += stretch;
-  }
-}
-
 void TRIANGLE_MESH::stretch2(const Real stretch)
 {
   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
@@ -403,7 +420,10 @@ void TRIANGLE_MESH::stretch2(const Real stretch)
   }
 }
 
-
+///////////////////////////////////////////////////////////////////////
+// Precompute the coefficients for calculating the internal force
+// and stiffness matrix.
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::createCoefs()
 {
   MATRIX m(_vertices.size()*2,_vertices.size()*2);
@@ -631,11 +651,12 @@ void TRIANGLE_MESH::createCoefs()
   temp.clear();
   cubq.clear();
   m.resize(0,0);
-
 }
+
 ///////////////////////////////////////////////////////////////////////
-//this will find the global force vector of forces on each unrestrained
-//vertex.
+// Compute internal forces using the precomputed method.
+// This will find the global force vector of forces on each unrestrained
+// vertex.
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::computeMaterialForces()
 {
@@ -671,6 +692,11 @@ void TRIANGLE_MESH::computeMaterialForces()
 
 }
 
+///////////////////////////////////////////////////////////////////////
+// Compute internal forces manually, by looping through triangles.
+// This will find the global force vector of forces on each unrestrained
+// vertex.
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::computeUnprecomputedMaterialForces()
 {
   //the global vector will be v= [f_0, f_1 ...] where each f_i = [x,y] (column vectors)
@@ -713,6 +739,9 @@ void TRIANGLE_MESH::computeUnprecomputedMaterialForces()
   _f = global_vector;
 }
 
+///////////////////////////////////////////////////////////////////////
+// A weird collision detection function
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::wackyCollision()
 {
   float kw = 100; // spring constant of wall
@@ -762,7 +791,10 @@ void TRIANGLE_MESH::wackyCollision()
     }
   }
 }
-// collision detection
+
+///////////////////////////////////////////////////////////////////////
+// A correct collision detection function
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::checkCollision()
 {
   float kw = 100; // spring constant of wall
@@ -799,7 +831,9 @@ void TRIANGLE_MESH::checkCollision()
 
 }
 
-// motion step using Euler Lagrange
+///////////////////////////////////////////////////////////////////////
+// Motion step using Euler-Lagrange equation of motion
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
 {
   //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
@@ -886,6 +920,7 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
 
 }
 ///////////////////////////////////////////////////////////////////////
+// a quasistatic step
 ///////////////////////////////////////////////////////////////////////
 bool TRIANGLE_MESH::stepQuasistatic()
 {
@@ -935,7 +970,7 @@ bool TRIANGLE_MESH::stepQuasistatic()
 }
 
 ///////////////////////////////////////////////////////////////////////
-// compute the stiffness matrix
+// compute the stiffness matrix using precomputed coefficients
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::computeStiffnessMatrix(MATRIX& K)
 {
@@ -958,6 +993,9 @@ void TRIANGLE_MESH::computeStiffnessMatrix(MATRIX& K)
   temp.clear();
 }
 
+///////////////////////////////////////////////////////////////////////
+// compute the stiffness matrix manually
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::computeUnprecomputedStiffnessMatrix(MATRIX& K)
 {
   //can assume K is the correct size, 2V x 2V
