@@ -1,0 +1,4 @@
+# convert an SVG image into a StVK simulation
+./bin/svgToPoly ./data/crag.svg ./data/crag.poly
+./bin/triangle -q35 ./data/crag.poly
+./bin/sim ./data/crag.1 MOTION -m -b -q 9

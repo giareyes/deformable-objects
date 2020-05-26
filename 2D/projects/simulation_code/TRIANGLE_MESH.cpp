@@ -1,6 +1,7 @@
 #include "TRIANGLE_MESH.h"
 #include "STVK.h"
 #include <iostream>
+#include <fstream>
 
 #include <float.h>
 #include <random>
@@ -22,192 +23,214 @@ TRIANGLE_MESH::~TRIANGLE_MESH()
   delete _material;
 }
 
-void TRIANGLE_MESH::buildBlob(const Real xPos, int sceneNum)
+void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_basis, int cols)
 {
   _vertices.clear();
   _triangles.clear();
   _constrainedVertices.clear();
   _unconstrainedVertices.clear();
+  int vertCount;
+  int size;
 
-  // build bottom (constrained) vertices
-  for(int i = 0; i < 5; i++)
-  {
-    VEC2 v0(xPos + 0.1*i, -0.35);
-    _vertices.push_back(v0);
-    _restVertices.push_back(v0);
-    _constrainedVertices.push_back(i);
-  }
+  // first we will get all the vertices and their coordinates. open the node file.
+  string nodeFile = filename + string(".node");
+  std::ifstream nodes(nodeFile);
 
-  // build tops to bottom triangles
-  int vCount = 5;
-  float scale = 5;
-  float base = xPos + 0.05;
-  for(int j = 4; j > 0; j--)
+  if (nodes.is_open())
   {
-    for(int i = 0; i < j; i++)
+    std::string line;
+
+    //get first line
+    std::getline(nodes, line);
+
+    // split first line
+    std::istringstream iss(line);
+
+    if(!(iss >> vertCount >> size)) // this line inside the if statement stores the values
     {
-      VEC2 v0(base + i*0.1, (sqrt(3.0) / 20.0)*(scale-j) -0.35 );
-      _vertices.push_back(v0);
-      _restVertices.push_back(v0);
-      (j == 1)? _constrainedVertices.push_back(vCount + i) : _unconstrainedVertices.push_back(vCount + i);
+      cout << "error: issue with file format" << endl;
+      nodes.close();
+      exit(0);
     }
-    vCount += j;
-    base += 0.05;
-  }
 
-  int endofBaseVerts = vCount;
-
-  // build left curved side vertices
-  for(int i = 0; i < 3; i++)
-  {
-    float y;
-    y = (i == 2)? (sqrt(3.0) / 20.0) + (sqrt(3.0) / 40.0) : (sqrt(3.0) / 40.0) + (i*(sqrt(3.0) / 20.0)/(i+1));
-    VEC2 vo(xPos - 0.03 + (i+i)*0.01, y -0.35 );
-    _vertices.push_back(vo);
-    _restVertices.push_back(vo);
-    _unconstrainedVertices.push_back(vCount);
-    vCount++;
-  }
-
-  VEC2 vo(xPos + 0.05, (sqrt(3.0) / 20.0)*2 -0.35);
-  _vertices.push_back(vo);
-  _restVertices.push_back(vo);
-  _unconstrainedVertices.push_back(vCount);
-  vCount++;
-
-  // build right curved side vertices
-  for(int i = 0; i < 3; i++)
-  {
-    float y;
-    y = (i == 2)? (sqrt(3.0) / 20.0) + (sqrt(3.0) / 40.0) : (sqrt(3.0) / 40.0) + (i*(sqrt(3.0) / 20.0)/(i+1));
-    VEC2 vo2(xPos + 0.4 + 0.03 - (i+i)*0.01, y -0.35);
-    _vertices.push_back(vo2);
-    _restVertices.push_back(vo2);
-    _unconstrainedVertices.push_back(vCount);
-    vCount++;
-  }
-
-  VEC2 vo2(xPos + 0.35, (sqrt(3.0) / 20.0)*2 -0.35);
-  _vertices.push_back(vo2);
-  _restVertices.push_back(vo2);
-  _unconstrainedVertices.push_back(vCount);
-  vCount++;
-
-  // build the base triangles
-  int oldCount = 0;
-  int newCount = 5;
-  for(int max = 4; max > 0; max--)
-  {
-  for(int i = 0; i < max; i++)
-  {
-      vector<VEC2*> v(4);
-      v[0] = &_vertices[oldCount + i];
-      v[1] = &_vertices[oldCount + i + 1];
-      v[2] = &_vertices[newCount + i];
-      if(i < max - 1)
-        v[3] = &_vertices[newCount + 1 + i];
-
-      //bottom
-      vector<VEC2*> triangle;
-      triangle.push_back(v[0]);
-      triangle.push_back(v[1]);
-      triangle.push_back(v[2]);
-      _triangles.push_back(TRIANGLE(_material, triangle));
-
-      //top
-      if(i < max - 1)
+    // we are only dealing with 2d now, but maybe we want to keep the option open for 3d implementation
+    if(size == 2)
+    {
+      VEC2 mins(1000,1000);
+      VEC2 maxs(-1000,-1000);
+      // store every vertex into our array
+      for(int i = 0; i < vertCount; i++)
       {
-        vector<VEC2*> top;
-        top.push_back(v[2]);
-        top.push_back(v[3]);
-        top.push_back(v[1]);
-        _triangles.push_back(TRIANGLE(_material, top));
+        //get the next line
+        std::getline(nodes, line);
+        std::istringstream iss2(line);
+
+        // x y coordinates to store
+        int index;
+        double x;
+        double y;
+
+        // if it doesnt match this format, there's an error
+        if(!(iss2 >> index >> x >> y))
+        {
+          cout << "error: issue with file format" << endl;
+          nodes.close();
+          exit(0);
+        }
+
+        // store this new vertex
+        VEC2 vert(x, y);
+        _vertices.push_back(vert);
+        _restVertices.push_back(vert);
+
+        // find the max and min x,y positions
+        if (vert[0] < mins[0])
+          mins[0] = vert[0];
+        if (vert[1] < mins[1])
+          mins[1] = vert[1];
+        if (vert[0] > maxs[0])
+          maxs[0] = vert[0];
+        if (vert[1] > maxs[1])
+          maxs[1] = vert[1];
+
+      }
+
+      // shift vertices down so that the object rests on the floor, then constrain some vertices.
+      for(int i = 0; i < vertCount; i++)
+      {
+        _vertices[i][1] += (-0.95 - mins[1]);
+        _restVertices[i][1] += (-0.95 - mins[1]);
+
+        (_restVertices[i][1] < -0.85 || (_restVertices[i][1] > maxs[1] - 1.05 - mins[1]))? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
       }
     }
-    oldCount = newCount;
-    newCount += max;
   }
-
-  // build curved vertices
-  for(int i = 0; i < 2; i++)
+  else // error! shut down
   {
-    vector<VEC2*> v(12);
-    v[0] = &_vertices[5 + i*3];
-    v[1] = &_vertices[0 + i*4];
-    v[2] = &_vertices[endofBaseVerts + i*4];
-    v[3] = &_vertices[endofBaseVerts + 1 + i*4];
-    v[4] = &_vertices[endofBaseVerts + 2 + i*4];
-    v[5] = &_vertices[endofBaseVerts + 3 + i*4];
-    v[6] = &_vertices[9 + i*2];
-    v[7] = &_vertices[endofBaseVerts - (3 - i)];
-
-    vector<VEC2*> triangle;
-    triangle.push_back(v[0]);
-    triangle.push_back(v[1]);
-    triangle.push_back(v[2]);
-    _triangles.push_back(TRIANGLE(_material, triangle));
-    triangle.clear();
-
-    triangle.push_back(v[0]);
-    triangle.push_back(v[2]);
-    triangle.push_back(v[3]);
-    _triangles.push_back(TRIANGLE(_material, triangle));
-    triangle.clear();
-
-    triangle.push_back(v[0]);
-    triangle.push_back(v[3]);
-    triangle.push_back(v[4]);
-    _triangles.push_back(TRIANGLE(_material, triangle));
-    triangle.clear();
-
-    triangle.push_back(v[0]);
-    triangle.push_back(v[6]);
-    triangle.push_back(v[4]);
-    _triangles.push_back(TRIANGLE(_material, triangle));
-    triangle.clear();
-
-    triangle.push_back(v[4]);
-    triangle.push_back(v[6]);
-    triangle.push_back(v[5]);
-    _triangles.push_back(TRIANGLE(_material, triangle));
-    triangle.clear();
-
-    triangle.push_back(v[5]);
-    triangle.push_back(v[6]);
-    triangle.push_back(v[7]);
-    _triangles.push_back(TRIANGLE(_material, triangle));
+    cout << " Could not open file " << nodeFile << "!!!" << endl;
+    exit(0);
   }
+
+  // we are done with the nodes file! close it.
+  nodes.close();
+
+  // open the file with the triangle definitions and create our array of triangles
+  nodeFile = filename + string(".ele");
+  std::ifstream polys(nodeFile);
+
+  if (polys.is_open())
+  {
+    std::string line;
+    int numTri; // the number of triangles we are creating
+    int numVert; // we need to make sure we are actually given 3 verts for a triangle
+
+    //get first line
+    std::getline(polys, line);
+
+    // split first line
+    std::istringstream iss(line);
+
+    if(!(iss >> numTri >> numVert)) // this line inside the if statement stores the values
+    {
+      cout << "error: issue with file format" << endl;
+      polys.close();
+      exit(0);
+    }
+
+    // this program is triangles only!!
+    if(numVert != 3)
+    {
+      cout << " This program only makes triangles. Error - too many verts!" << endl;
+      polys.close();
+      exit(0);
+    }
+
+    // loop through to create the triangles
+    for(int i = 0; i < numTri; i++)
+    {
+      //get the next line
+      std::getline(polys, line);
+      std::istringstream iss2(line);
+
+      // vertices to store
+      int index;
+      int v1;
+      int v2;
+      int v3;
+
+      // if it doesnt match this format, there's an error
+      if(!(iss2 >> index >> v1 >> v2 >> v3))
+      {
+        cout << "error: issue with file format" << endl;
+        polys.close();
+        exit(0);
+      }
+
+      // make and save triangle
+      vector<VEC2*> triangle;
+      triangle.push_back(&_vertices[v1 - 1]);
+      triangle.push_back(&_vertices[v2 - 1]);
+      triangle.push_back(&_vertices[v3 - 1]);
+      _triangles.push_back(TRIANGLE(_material, triangle));
+    }
+  }
+  else // error! shut down
+  {
+    cout << " Could not open file " << nodeFile << "!!!" << endl;
+    nodes.close();
+    exit(0);
+  }
+
+  polys.close();
 
   // allocate the state vectors
   _DOFs = 2 * (_vertices.size() - _constrainedVertices.size());
 
+  // if this is not a motion sim with translation
   if (sceneNum)
-    basisNoTranslation();
+  {
+    size = _unconstrainedVertices.size()*2;
+    if(!create_basis)
+    {
+      basisNoTranslation(filename, cols);
+      size = _vertices.size()*2;
+    }
+  }
   else
   {
+    // this function doesn't actually work - currently motion won't be reduced
     setBasisReduction();
+    size = _vertices.size()*2;
   }
 
-  setMassMatrix();
+  // create the mass matrix
+  setMassMatrix(!create_basis);
 
-  VECTOR zeros(_vertices.size()*2);
+  // set all vectors to zero and determine their size
+  VECTOR zeros(size);
   VECTOR z2(_U.cols());
 
   z2.setZero();
-
   zeros.setZero();
+
   _u            = zeros;
   _q            = z2;
+  // _ra           = z2;
+  // _rv           = z2;
+  // _f            = z2;
+  _f            = z2;
   _ra           = z2;
   _rv           = z2;
-  _f            = z2;
   _fExternal    = zeros;
   _acceleration = zeros;
   _velocity     = zeros;
 
   // compute the reverse lookup
   computeVertexToIndexTable();
-  createCoefs();
+
+  // if we aren't creating a basis, then create the tensor coefficients for precomputed method
+  if(!create_basis)
+    createCoefs();
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -232,6 +255,7 @@ void TRIANGLE_MESH::computeVertexToIndexTable()
 }
 
 ///////////////////////////////////////////////////////////////////////
+// set new vertex coordinates by adding displacements
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::uScatter()
 {
@@ -244,6 +268,7 @@ void TRIANGLE_MESH::uScatter()
 }
 
 ///////////////////////////////////////////////////////////////////////
+// set displacements
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::uGather()
 {
@@ -255,7 +280,10 @@ void TRIANGLE_MESH::uGather()
   }
 }
 
-void TRIANGLE_MESH::setMassMatrix()
+///////////////////////////////////////////////////////////////////////
+// set the mass matrix. If reduction, then multiply by U on both sides
+///////////////////////////////////////////////////////////////////////
+void TRIANGLE_MESH::setMassMatrix(bool reduction)
 {
   // matrix of size 2Nx2N
   MATRIX M(_vertices.size()*2,_vertices.size()*2);
@@ -263,199 +291,67 @@ void TRIANGLE_MESH::setMassMatrix()
   //for now we will make every vertex has mass 1
   M.setIdentity();
   M = M*15;
-  M = M*_U;
-  M = _U.transpose() * M;
+
+  if (reduction)
+  {
+    M = M*_U;
+    M = _U.transpose() * M;
+  }
   _mass = M;
 }
 
-void TRIANGLE_MESH::basisNoTranslation()
+///////////////////////////////////////////////////////////////////////
+// Create a basis matrix with no translation.
+// this is done by reading in a basis file, then performing SVD.
+// the basis file is created by doing multiple quasistatic tests
+// on the unreduced model, then storing displacements.
+///////////////////////////////////////////////////////////////////////
+void TRIANGLE_MESH::basisNoTranslation(const char* filename, int basis_cols)
 {
-  MATRIX U(46,9);
-  MATRIX svddiag(46, 9);
+  FILE* file = NULL;
+  int rows;
+  int cols;
+  string readin = filename + string(".basis");
+  file = fopen(readin.c_str(), "r");
+  fscanf(file, "%i %i", &rows, &cols);
+  MATRIX U(rows, cols);
+  MATRIX svddiag(rows, basis_cols);
+  for(int i = 0; i < rows; i++)
+  {
+    for(int j = 0; j < cols; j++)
+      fscanf(file, "%lf", &U(i,j));
+  }
 
-  U << 0.011446,  -0.002633,  -0.016704,   0.032098,  -0.009118,  -0.054865,  -0.054865,    0.088559,   0.067614,
-     0.005271,  -0.001795,  -0.006527,   0.005844,  -0.015733,  -0.019406,  -0.019406,    0.006542,    -0.021152,
-     0.004064,  -0.000470,  -0.017430,   0.022485,  -0.002303,  -0.085461,  -0.055144,    0.085461,     0.059172,
-     0.009012,  -0.001448,  -0.000137,   0.003981,  -0.011465,  -0.000642,  -0.014926,    0.000642,    -0.017341,
-    -0.004064,   0.000470,  -0.022485,   0.017430,   0.002303,  -0.085461,  -0.059079,    0.085461,     0.055184,
-     0.009012,  -0.001448,   0.003981,  -0.000137,  -0.011465,   0.000642,  -0.017255,   -0.000642,    -0.014943,
-    -0.011446,   0.002633,  -0.032098,   0.016704,   0.009118,  -0.088559,  -0.067503,    0.088559,     0.054882,
-     0.005271,  -0.001795,   0.005844,  -0.006527,  -0.015733,   0.006542,  -0.020597,   -0.006542,    -0.019407,
-     0.012217,  -0.003448,  -0.042263,   0.064138,  -0.005182,  -0.134988,  -0.079721,    0.134988,     0.101109,
-     0.019461,  -0.005735,  -0.006665,   0.013395,  -0.022996,  -0.001420,  -0.013228,    0.001420,    -0.019055,
-     0.000000,   0.000000,  -0.048845,   0.048845,   0.000000,  -0.138178,  -0.088842,    0.138178,     0.088817,
-     0.022649,  -0.002830,   0.004947,   0.004947,  -0.019589,   0.000000,  -0.014737,   -0.000000,    -0.014741,
-    -0.012217,   0.003448,  -0.064138,   0.042263,   0.005182,  -0.134988,  -0.101219,    0.134988,     0.079705,
-     0.019461,  -0.005735,   0.013395,  -0.006665,  -0.022996,   0.001420,  -0.018808,   -0.001420,    -0.013217,
-     0.012745,  -0.008094,  -0.085459,   0.113785,   0.002792,  -0.134270,  -0.063082,    0.134270,     0.086800,
-     0.039573,  -0.011360,  -0.004205,   0.013985,  -0.020846,   0.013096,   0.000750,   -0.013096,    -0.009037,
-    -0.012745,   0.008094,  -0.113785,   0.085459,  -0.002792,  -0.134270,  -0.086941,    0.134270,     0.063019,
-     0.039573,  -0.011360,   0.013985,  -0.004205,  -0.020846,  -0.013096,  -0.008899,    0.013096,     0.000746,
-     0.008654,  -0.002118,  -0.012365,   0.025727,  -0.019616,  -0.066554,  -0.030756,    0.066554,     0.069918,
-     0.003497,  -0.001276,  -0.014071,   0.008843,  -0.032046,  -0.041551,  -0.032057,    0.041551,    -0.002250,
-     0.011032,  -0.002679,  -0.019256,   0.036220,  -0.017551,  -0.098034,  -0.055586,    0.098034,     0.091227,
-     0.004048,  -0.001544,  -0.015372,   0.010157,  -0.034182,  -0.037453,  -0.036060,    0.037453,    -0.005837,
-     0.015469,  -0.003856,  -0.029304,   0.052425,  -0.017910,  -0.124694,  -0.070971,    0.124694,     0.114063,
-     0.003343,  -0.001598,  -0.017875,   0.008649,  -0.034542,  -0.031420,  -0.033724,    0.031420,    -0.013374,
-     0.014198,  -0.003726,  -0.039106,   0.064256,  -0.010398,  -0.140364,  -0.081399,    0.140364,     0.113799,
-     0.010418,  -0.003566,  -0.013914,   0.010963,  -0.032107,  -0.019283,  -0.025475,    0.019283,    -0.013915,
-    -0.008654,   0.002118,  -0.025727,   0.012365,   0.019616,  -0.066554,  -0.072897,    0.066554,     0.030760,
-     0.003498,  -0.001276,   0.008843,  -0.014071,  -0.032046,   0.041551,  -0.005429,   -0.041551,    -0.032057,
-    -0.011032,   0.002679,  -0.036220,   0.019256,   0.017551,  -0.098034,  -0.091957,    0.098034,     0.055597,
-     0.004048,  -0.001544,   0.010157,  -0.015372,  -0.034182,   0.037453,  -0.006969,   -0.037453,    -0.036057,
-    -0.015469,   0.003856,  -0.052425,   0.029304,   0.017910,  -0.124694,  -0.114055,    0.124694,     0.070974,
-     0.003343,  -0.001598,   0.008649,  -0.017875,  -0.034542,   0.031420,  -0.012945,   -0.031420,    -0.033711,
-    -0.014198,   0.003726,  -0.064256,   0.039106,   0.010398,  -0.140364,  -0.113929,    0.140364,     0.081385,
-     0.010418,  -0.003566,   0.010963,  -0.013914,  -0.032107,   0.019283,  -0.013573,   -0.019283,    -0.025460,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000;
+  fclose(file);
 
-     JacobiSVD<MatrixXd> svd( U, ComputeFullV | ComputeFullU );
-     svddiag = svd.matrixU();
-     svddiag.conservativeResize(svddiag.rows(),9);
-     _U = svddiag;
+  JacobiSVD<MatrixXd> svd( U, ComputeFullV | ComputeFullU );
+   svddiag = svd.matrixU();
+   svddiag.conservativeResize(svddiag.rows(), basis_cols);
+   _U = svddiag;
 
-     // free space
-     U.resize(0,0);
+  // printMatrix(_U);
 }
 
+///////////////////////////////////////////////////////////////////////
+// Create a basis matrix with translation.
+// NOTE: THIS CURRENTLY DOES NOTHING. IGNORE FOR NOW, REWRITE LATER.
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::setBasisReduction()
 {
   MATRIX U(46,9);
-  MATRIX T(46,2);
-  MATRIX svddiag(46, 9);
-  MATRIX intermediate(46, 11);
-  svddiag.setIdentity();
-  // matrix of deformations
-  U << 0.011446,  -0.002633,  -0.016704,   0.032098,  -0.009118,  -0.054865,  -0.054865,    0.088559,   0.067614,
-     0.005271,  -0.001795,  -0.006527,   0.005844,  -0.015733,  -0.019406,  -0.019406,    0.006542,    -0.021152,
-     0.004064,  -0.000470,  -0.017430,   0.022485,  -0.002303,  -0.085461,  -0.055144,    0.085461,     0.059172,
-     0.009012,  -0.001448,  -0.000137,   0.003981,  -0.011465,  -0.000642,  -0.014926,    0.000642,    -0.017341,
-    -0.004064,   0.000470,  -0.022485,   0.017430,   0.002303,  -0.085461,  -0.059079,    0.085461,     0.055184,
-     0.009012,  -0.001448,   0.003981,  -0.000137,  -0.011465,   0.000642,  -0.017255,   -0.000642,    -0.014943,
-    -0.011446,   0.002633,  -0.032098,   0.016704,   0.009118,  -0.088559,  -0.067503,    0.088559,     0.054882,
-     0.005271,  -0.001795,   0.005844,  -0.006527,  -0.015733,   0.006542,  -0.020597,   -0.006542,    -0.019407,
-     0.012217,  -0.003448,  -0.042263,   0.064138,  -0.005182,  -0.134988,  -0.079721,    0.134988,     0.101109,
-     0.019461,  -0.005735,  -0.006665,   0.013395,  -0.022996,  -0.001420,  -0.013228,    0.001420,    -0.019055,
-     0.000000,   0.000000,  -0.048845,   0.048845,   0.000000,  -0.138178,  -0.088842,    0.138178,     0.088817,
-     0.022649,  -0.002830,   0.004947,   0.004947,  -0.019589,   0.000000,  -0.014737,   -0.000000,    -0.014741,
-    -0.012217,   0.003448,  -0.064138,   0.042263,   0.005182,  -0.134988,  -0.101219,    0.134988,     0.079705,
-     0.019461,  -0.005735,   0.013395,  -0.006665,  -0.022996,   0.001420,  -0.018808,   -0.001420,    -0.013217,
-     0.012745,  -0.008094,  -0.085459,   0.113785,   0.002792,  -0.134270,  -0.063082,    0.134270,     0.086800,
-     0.039573,  -0.011360,  -0.004205,   0.013985,  -0.020846,   0.013096,   0.000750,   -0.013096,    -0.009037,
-    -0.012745,   0.008094,  -0.113785,   0.085459,  -0.002792,  -0.134270,  -0.086941,    0.134270,     0.063019,
-     0.039573,  -0.011360,   0.013985,  -0.004205,  -0.020846,  -0.013096,  -0.008899,    0.013096,     0.000746,
-     0.008654,  -0.002118,  -0.012365,   0.025727,  -0.019616,  -0.066554,  -0.030756,    0.066554,     0.069918,
-     0.003497,  -0.001276,  -0.014071,   0.008843,  -0.032046,  -0.041551,  -0.032057,    0.041551,    -0.002250,
-     0.011032,  -0.002679,  -0.019256,   0.036220,  -0.017551,  -0.098034,  -0.055586,    0.098034,     0.091227,
-     0.004048,  -0.001544,  -0.015372,   0.010157,  -0.034182,  -0.037453,  -0.036060,    0.037453,    -0.005837,
-     0.015469,  -0.003856,  -0.029304,   0.052425,  -0.017910,  -0.124694,  -0.070971,    0.124694,     0.114063,
-     0.003343,  -0.001598,  -0.017875,   0.008649,  -0.034542,  -0.031420,  -0.033724,    0.031420,    -0.013374,
-     0.014198,  -0.003726,  -0.039106,   0.064256,  -0.010398,  -0.140364,  -0.081399,    0.140364,     0.113799,
-     0.010418,  -0.003566,  -0.013914,   0.010963,  -0.032107,  -0.019283,  -0.025475,    0.019283,    -0.013915,
-    -0.008654,   0.002118,  -0.025727,   0.012365,   0.019616,  -0.066554,  -0.072897,    0.066554,     0.030760,
-     0.003498,  -0.001276,   0.008843,  -0.014071,  -0.032046,   0.041551,  -0.005429,   -0.041551,    -0.032057,
-    -0.011032,   0.002679,  -0.036220,   0.019256,   0.017551,  -0.098034,  -0.091957,    0.098034,     0.055597,
-     0.004048,  -0.001544,   0.010157,  -0.015372,  -0.034182,   0.037453,  -0.006969,   -0.037453,    -0.036057,
-    -0.015469,   0.003856,  -0.052425,   0.029304,   0.017910,  -0.124694,  -0.114055,    0.124694,     0.070974,
-     0.003343,  -0.001598,   0.008649,  -0.017875,  -0.034542,   0.031420,  -0.012945,   -0.031420,    -0.033711,
-    -0.014198,   0.003726,  -0.064256,   0.039106,   0.010398,  -0.140364,  -0.113929,    0.140364,     0.081385,
-     0.010418,  -0.003566,   0.010963,  -0.013914,  -0.032107,   0.019283,  -0.013573,   -0.019283,    -0.025460,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000,
-     0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,   0.000000,    0.000000,     0.000000;
-
-     T << 1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000,
-          1.000000,  0.000000,
-          0.000000,  1.000000;
-
-  T = (1.0/pow(23.0, 0.5))*T;
-
-  JacobiSVD<MatrixXd> svd( U, ComputeFullV | ComputeFullU );
-  svddiag = svd.matrixU();
-  svddiag.conservativeResize(svddiag.rows(),9);
-
-  intermediate.col(0) = T.col(0);
-  intermediate.col(1) = T.col(1);
-  for(int i = 2; i < 11; i++)
-  {
-    intermediate.col(i) = svddiag.col(i - 2) - (T.col(0).transpose()*svddiag.col(i - 2))*T.col(0);
-    intermediate.col(i) = intermediate.col(i) - (T.col(1).transpose()*intermediate.col(i))*T.col(1);
-  }
-
-  _U = intermediate;
-
-  U.resize(0,0);
-  T.resize(0,0);
+  _U = U;
 }
 
+///////////////////////////////////////////////////////////////////////
+// Convert reduced coordinates to actual displacement
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::qTou()
 {
   _u = _U * _q;
 }
+
 ///////////////////////////////////////////////////////////////////////
+// Add external force to be applied to all vertices
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::addBodyForce(const VEC2& bodyForce)
 {
@@ -466,6 +362,9 @@ void TRIANGLE_MESH::addBodyForce(const VEC2& bodyForce)
   }
 }
 
+///////////////////////////////////////////////////////////////////////
+// Add force to a single vertex
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::addSingleForce(const VEC2& bodyForce, int vertex)
 {
   std::vector<int>::iterator it = std::find(_constrainedVertices.begin(), _constrainedVertices.end(), vertex);
@@ -492,7 +391,7 @@ void TRIANGLE_MESH::stepShearTest(const Real shear)
   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
   {
     int right = _constrainedVertices[x];
-    if (_restVertices[right][1] > -.35)
+    if (_restVertices[right][1] > -.85)
       _vertices[right][0] += shear;
   }
 }
@@ -500,16 +399,6 @@ void TRIANGLE_MESH::stepShearTest(const Real shear)
 ///////////////////////////////////////////////////////////////////////
 // advance the constrained nodes for the stretch test
 ///////////////////////////////////////////////////////////////////////
-void TRIANGLE_MESH::stepStretchTest(const Real stretch)
-{
-  for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
-  {
-    int right = _constrainedVertices[x];
-    if (_restVertices[right][0] > 0.15)
-      _vertices[right][0] += stretch;
-  }
-}
-
 void TRIANGLE_MESH::stretch2(const Real stretch)
 {
   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
@@ -520,7 +409,10 @@ void TRIANGLE_MESH::stretch2(const Real stretch)
   }
 }
 
-
+///////////////////////////////////////////////////////////////////////
+// Precompute the coefficients for calculating the internal force
+// and stiffness matrix.
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::createCoefs()
 {
   MATRIX m(_vertices.size()*2,_vertices.size()*2);
@@ -529,6 +421,7 @@ void TRIANGLE_MESH::createCoefs()
   TENSOR3 quadl(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2);
   TENSOR4 tempQuad(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2,_vertices.size()*2);
   TENSOR4 temp(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2,_vertices.size()*2);
+
   m.setZero();
   constTemp.setZero();
 
@@ -686,6 +579,7 @@ void TRIANGLE_MESH::createCoefs()
     cubquad.clear();
   }
 
+  // reduction matrix
   MATRIX transpose = _U.transpose();
 
   // set reduced coefficients for the cubic polynomial
@@ -693,6 +587,7 @@ void TRIANGLE_MESH::createCoefs()
   // linear term
   _linearCoef = transpose*(m*_U);
   m.resize(0,0);
+
 
   // cubic coefficient
   _cubicCoef = temp.modeFourProduct(transpose);
@@ -711,6 +606,7 @@ void TRIANGLE_MESH::createCoefs()
 
   // constant term
   _constCoef = transpose*(constTemp*_U);
+  constTemp.resize(0,0);
 
   // linear term
   _quadlinear = quadl.modeThreeProduct(transpose);
@@ -725,38 +621,39 @@ void TRIANGLE_MESH::createCoefs()
   _quadraticCoef = _quadraticCoef.modeTwoProduct(transpose);
   _quadraticCoef = _quadraticCoef.modeOneProduct(transpose);
 
-  // free memory
+  // free memory if reduced
   transpose.resize(0,0);
-  temp.clear();
-  cubq.clear();
-  m.resize(0,0);
-
 }
+
 ///////////////////////////////////////////////////////////////////////
-//this will find the global force vector of forces on each unrestrained
-//vertex.
+// Compute internal forces using the precomputed method.
+// This will find the global force vector of forces on each unrestrained
+// vertex.
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::computeMaterialForces()
 {
   //the global vector will be v= [f_0, f_1 ...] where each f_i = [x,y] (column vectors)
   //and forces are only for unconstrained vertices. This means the size of this vector is
 
-  VECTOR global_vector(_q.size());
+  VECTOR displacement = _q;
+  // VECTOR displacement = _u;
+
+  VECTOR global_vector(displacement.size());
   global_vector.setZero();
 
   //add linear term to global vector
-  global_vector += (_linearCoef * _q);
+  global_vector += (_linearCoef * displacement);
 
   // compute the cubic term
-  TENSOR3 temp = _cubicCoef.modeFourProduct(_q);
-  MATRIX tempMatrix = temp.modeThreeProduct(_q);
+  TENSOR3 temp = _cubicCoef.modeFourProduct(displacement);
+  MATRIX tempMatrix = temp.modeThreeProduct(displacement);
 
   //add the cubic term to the global vector
-  global_vector += (tempMatrix*_q);
+  global_vector += (tempMatrix*displacement);
 
   //compute the quadratic term, add to global vector
-  tempMatrix = _cubicquad.modeThreeProduct(_q);
-  global_vector += (tempMatrix * _q);
+  tempMatrix = _cubicquad.modeThreeProduct(displacement);
+  global_vector += (tempMatrix * displacement);
 
   // clear the memory of temporary things
   tempMatrix.resize(0,0);
@@ -767,6 +664,56 @@ void TRIANGLE_MESH::computeMaterialForces()
 
 }
 
+///////////////////////////////////////////////////////////////////////
+// Compute internal forces manually, by looping through triangles.
+// This will find the global force vector of forces on each unrestrained
+// vertex.
+///////////////////////////////////////////////////////////////////////
+void TRIANGLE_MESH::computeUnprecomputedMaterialForces()
+{
+  //the global vector will be v= [f_0, f_1 ...] where each f_i = [x,y] (column vectors)
+  //and forces are only for unconstrained vertices. This means the size of this vector is
+  // size(unconstrained vertices)*2 since each has an x,y component
+  VECTOR global_vector(_unconstrainedVertices.size()*2);
+  global_vector.setZero();
+
+  //loop through triangles, calculate force on each local point
+  //convert local vertices to global vertex
+  //add force computed into global vertex spot of global_vector
+  int n_of_triangles = _triangles.size();
+
+  for(int x = 0; x < n_of_triangles; x++)
+  {
+    //get our current triangle
+    TRIANGLE current = getTriangle(x);
+
+    //find the force vector that's being applied to this triangle
+    VECTOR current_force = current.computeForceVector();
+
+    //add the forces into the right place in the global force vector
+    for(int y = 0; y < 3; y++)
+    {
+      //get current triangle vertex y
+      VEC2* current_v = _triangles[x].vertex(y);
+
+      //if the vertex we're on is unconstrained, add it to the global vector
+      if(_vertexToIndex.find(current_v) != _vertexToIndex.end())
+      {
+        //find the global index using the vertexToIndex map
+        int global_index = _vertexToIndex[current_v];
+        global_vector[global_index] += current_force[2*y];
+        global_vector[global_index + 1] += current_force[2*y + 1];
+      }
+    }
+  }
+
+  //store global vector into _f
+  _f = global_vector;
+}
+
+///////////////////////////////////////////////////////////////////////
+// A weird collision detection function
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::wackyCollision()
 {
   float kw = 100; // spring constant of wall
@@ -816,7 +763,10 @@ void TRIANGLE_MESH::wackyCollision()
     }
   }
 }
-// collision detection
+
+///////////////////////////////////////////////////////////////////////
+// A correct collision detection function
+///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::checkCollision()
 {
   float kw = 100; // spring constant of wall
@@ -850,19 +800,32 @@ void TRIANGLE_MESH::checkCollision()
       }
     }
   }
+
 }
 
-// motion step using Euler Lagrange
-void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
+///////////////////////////////////////////////////////////////////////
+// Motion step using Euler-Lagrange equation of motion
+///////////////////////////////////////////////////////////////////////
+void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
 {
   //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
+  // MATRIX K(_u.size(),_u.size() );
+  // MATRIX D(_u.size(),_u.size() );
+
+  //reduced
   MATRIX K(_q.size(),_q.size() );
   MATRIX D(_q.size(),_q.size() );
+
   MATRIX inverse;
   float alpha = 0.01; // constant for damping
   float beta = 0.02;  // constant for damping
 
-  checkCollision();
+  // in barbic, idk if you need to check collision with the wall.
+  if (sceneNum == 0)
+  {
+    printf("checking collision\n");
+    checkCollision();
+  }
 
   // Newton Raphson Iteration, but j-max is 1 so no need to write the loop
   //step 1: compute K
@@ -872,8 +835,8 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
   // step 2: compute D
   D = alpha*_mass - beta*K;
 
-
   // step 3: calculate f_external
+  // VECTOR reducedF = _fExternal;
   VECTOR reducedF = _U.transpose() * _fExternal;
 
   // step 4: compute R(q+1)
@@ -901,6 +864,7 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
   inverse.resize(0,0);
 
   // step 7: update q and u
+  // _u += dq;
   _q += dq;
   qTou();
 
@@ -921,38 +885,45 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
   _ra = a1*dq - a2*_rv - a3*_ra;
   _rv = newVel;
   _velocity = _U*_rv;
+  // _velocity = _rv;
 
   _fExternal.setZero();
   _f.setZero();
 
 }
 ///////////////////////////////////////////////////////////////////////
+// a quasistatic step
 ///////////////////////////////////////////////////////////////////////
 bool TRIANGLE_MESH::stepQuasistatic()
 {
   //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
-  MATRIX K(_q.size(),_q.size());
+  MATRIX K(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
+  // MATRIX K(_u.size(),_u.size());
+  // MATRIX K(_q.size(),_q.size());
 
   //step 1: compute K
   K.setZero();
-  computeStiffnessMatrix(K);
+  computeUnprecomputedStiffnessMatrix(K);
 
   //step 2: compute internal material forces, R(uq)
-  computeMaterialForces();
+  computeUnprecomputedMaterialForces();
 
   // //step 3: external forces transform
-  VECTOR reducedF = _U.transpose() * _fExternal;
+  // VECTOR reducedF = _U.transpose() * _fExternal;
 
   // step 4: form the residual (r = F + E)
-  VECTOR r2 = -1*(_f + reducedF);
+  VECTOR r2 = -1*(_f + _fExternal);
+  // VECTOR r2 = -1*(_f + reducedF);
 
   //step 5: compute x = K .inverse().eval()  * r
-  MATRIX inverse2 = K.inverse().eval();
-  VECTOR x2 = inverse2*r2;
+  // MATRIX inverse2 = K.inverse().eval();
+  // VECTOR x2 = inverse2*r2;
+  VECTOR x2 = K.colPivHouseholderQr().solve(r2);
 
   //step 6: add solution x to displamcement vector _u
-  _q += x2;
-  qTou();
+  _u += x2;
+  // _q += x2;
+  // qTou();
 
   //step 7: update all node positions w new displacement vector
   uScatter();
@@ -960,30 +931,78 @@ bool TRIANGLE_MESH::stepQuasistatic()
   //reset forces to 0
   _fExternal.setZero();
   _f.setZero();
+  K.resize(0,0);
 
-  static int counter = 0;
-  cout << " Quasistatic step: " << counter << endl;
-  counter++;
   return true;
 }
 
 ///////////////////////////////////////////////////////////////////////
-// compute the stiffness matrix
+// compute the stiffness matrix using precomputed coefficients
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::computeStiffnessMatrix(MATRIX& K)
 {
   //can assume K is the correct size, 2V x 2V
 
+  VECTOR displacement = _q;
+  // VECTOR displacement = _u;
+
   // compute quadratic term and add to K
-  TENSOR3 temp = _quadraticCoef.modeFourProduct(_q);
-  K = temp.modeThreeProduct(_q);
+  TENSOR3 temp = _quadraticCoef.modeFourProduct(displacement);
+  K = temp.modeThreeProduct(displacement);
 
   // compute linear term and add to K
-  K += _quadlinear.modeThreeProduct(_q);
+  K += _quadlinear.modeThreeProduct(displacement);
 
   // add constant term to K
   K += _constCoef;
 
   // free space
   temp.clear();
+}
+
+///////////////////////////////////////////////////////////////////////
+// compute the stiffness matrix manually
+///////////////////////////////////////////////////////////////////////
+void TRIANGLE_MESH::computeUnprecomputedStiffnessMatrix(MATRIX& K)
+{
+  //can assume K is the correct size, 2V x 2V
+
+  int n_of_triangles = _triangles.size();
+
+  //go through each triangle and map vertices to their global vertices. if
+  //unrestrained, then add to the poisition in the global K.
+  for(int x = 0; x < n_of_triangles; x++)
+  {
+    TRIANGLE current = getTriangle(x);
+
+    //find the force vector that's being applied to this triangle
+    MATRIX current_force = current.computeForceJacobian();
+
+    for(int i = 0; i < 3; i++)
+    {
+      //get current triangle vertex y
+      VEC2* current_iv = _triangles[x].vertex(i);
+
+      //if the vertex we're on is unconstrained, add it to the global K
+      if(_vertexToIndex.find(current_iv) != _vertexToIndex.end())
+      {
+        //find the global index using the vertexToIndex map
+        int global_index_i = _vertexToIndex[current_iv];
+
+        for(int j = 0; j < 3; j++)
+        {
+          VEC2* current_jv = _triangles[x].vertex(j);
+
+          if(_vertexToIndex.find(current_jv) != _vertexToIndex.end())
+          {
+            int global_index_j = _vertexToIndex[current_jv];
+            K(global_index_i, global_index_j) += current_force(2*i, 2*j);
+            K(global_index_i, global_index_j + 1) += current_force(2*i, 2*j + 1);
+            K(global_index_i + 1, global_index_j) += current_force(2*i + 1, 2*j);
+            K(global_index_i + 1, global_index_j + 1) += current_force(2*i + 1, 2*j + 1);
+          }
+        }
+      }
+    }
+  }
 }

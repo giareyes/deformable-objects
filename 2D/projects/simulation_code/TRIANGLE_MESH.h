@@ -17,28 +17,32 @@ public:
 
   // add walls
   void addWall(const WALL& wall)             { _walls.push_back(wall); };
-  // build the different kinds of tests
-  void buildBlob(const Real xPos, int sceneNum);
 
+  // build the deformable model
+  void buildBlob(int sceneNum, const char* filename, bool create_basis, int cols);
+
+  // take a step
   bool stepQuasistatic();
 
 //----------------------------------------------------------
   // Euler's equation of motion
-  void stepMotion(float dt, const VEC2& outerForce);
+  void stepMotion(float dt, const VEC2& outerForce, int sceneNum);
 
   // regular equation of motion
-  void setMassMatrix();
+  void setMassMatrix(bool reduction);
 
-  // set U
+  // set U with translation
   void setBasisReduction();
 
-  void basisNoTranslation();
+  // set U without translation by reading in a file and num of cols
+  void basisNoTranslation(const char* filename, int basis_cols);
 
-  void uToq();
-
+  // reduced coordinates to displacement
   void qTou();
 
+  // add a force to a single vertex
   void addSingleForce(const VEC2& bodyForce, int vertex);
+
   // your average joe collision detection
   void checkCollision();
 
@@ -50,8 +54,7 @@ public:
 
 //----------------------------------------------------------
 
-  // advance the constrained nodes for the stretch test
-  void stepStretchTest(const Real stretch);
+  // a few functions for deforming the model slightly
   void stretch2(const Real stretch);
   void stepSquashTest(const Real squash);
   void stepShearTest(const Real stretch);
@@ -63,11 +66,13 @@ public:
   // get a specific triangle
   TRIANGLE& getTriangle(const int index) { return _triangles[index]; };
 
+  // get specific details about the triangle mesh
   const int DOFs() { return _DOFs; };
   const std::vector<TRIANGLE>& triangles() { return _triangles; };
   std::vector<VEC2>& vertices() { return _vertices; };
   std::vector<int>& unconstrainedVertices() { return _unconstrainedVertices; };
   void setDisplacement(int index, float d) { _u[index] = d; };
+  VECTOR getDisplacement() {return _u; };
   const std::vector<int>& constrainedVertices() { return _constrainedVertices; };
   vector<WALL>& walls() { return _walls; };
 
@@ -78,46 +83,47 @@ private:
   // gather displacement u from the vertices
   void uGather();
 
+  // compute internal force using precomputed coefficients
   void computeMaterialForces();
+
+  // compute internal force manually
+  void computeUnprecomputedMaterialForces();
 
   // rebuild the vertex-to-index lookup
   void computeVertexToIndexTable();
 
+  // compute stiffness matrix using precomputed coefficients
   void computeStiffnessMatrix(MATRIX& K);
+
+  // compute stiffness matrix manually
+  void computeUnprecomputedStiffnessMatrix(MATRIX& K);
 
   // how many degrees of freedom are there?
   int _DOFs;
 
-  // the displacement vector
-  VECTOR _u;
-  VECTOR _q;
+  VECTOR _u; // the displacement vector
+  VECTOR _q; // the reduced displacement vector
 
-  // change of basis matrix
-  MATRIX _U;
+  MATRIX _U; // change of basis matrix
 
-  // the force vector
-  VECTOR _f;
-  VECTOR _fExternal;
+  VECTOR _f; // the internal force vector
+  VECTOR _fExternal; // the external force vector
 
-  // mass matrix
-  MATRIX _mass;
+  MATRIX _mass; // mass matrix
 
-  // velocity and acceleration
-  VECTOR _velocity;
-  VECTOR _acceleration;
+  VECTOR _velocity; // unreduced velocity
+  VECTOR _acceleration; // unreduced acceleration
 
-  // reduced velocity and accleration
-  VECTOR _rv;
-  VECTOR _ra;
+  VECTOR _rv; // reduced velocity
+  VECTOR _ra; // reduced acceleration
 
-  // coefficients for precomputation
-  MATRIX _linearCoef;
-  MATRIX _constCoef;
+  MATRIX _constCoef; // constant matrix for stiffness matrix calculation
+  TENSOR3 _quadlinear; // linear coefficient for stiffness matrix calculation
+  TENSOR4 _quadraticCoef; // quadratic coefficient for stiffness matrix calculation
 
-  TENSOR4 _quadraticCoef;
-  TENSOR3 _quadlinear;
-  TENSOR3 _cubicquad;
-  TENSOR4 _cubicCoef;
+  MATRIX _linearCoef; // linear coefficient for internal force calculation
+  TENSOR3 _cubicquad; // quadratic coefficient for internal force calculation
+  TENSOR4 _cubicCoef; // cubic coefficient for internal force calculation
 
   // the geometry
   std::vector<VEC2>   _vertices;

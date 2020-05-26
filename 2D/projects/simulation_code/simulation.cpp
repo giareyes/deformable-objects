@@ -1,6 +1,7 @@
 #include "SETTINGS.h"
 #include <cmath>
 #include <iostream>
+#include <fstream>
 #include <vector>
 
 #if _WIN32
@@ -36,11 +37,12 @@ int mouseModifiers = -1;
 // animate the current runEverytime()?
 bool animate = false;
 bool singleStep = false;
+bool createBasis = false;
 // float dt = 1.0/15360.0;
 float dt = 1.0/100.0;
 
 // the current viewer eye position
-VEC3 eyeCenter(0.9, 0.6, 1);
+VEC3 eyeCenter(0, 0, 1);
 
 // current zoom level into the field
 float zoom = 2.0;
@@ -49,6 +51,7 @@ float zoom = 2.0;
 // old:
 Real poissonsRatio = 0.4;
 Real youngsModulus = 1.0;
+int basisCols = 0;
 
 // testing:
 // Real poissonsRatio = 0.4;
@@ -241,10 +244,11 @@ void glutMouseMotion(int x, int y)
 
   if (mouseButton == GLUT_LEFT_BUTTON)
   {
-    double screenX = ((double) x / 400.0) - 0.09;
-    double screenY = ((double) (800 - y) / 400.0) - 0.35;
-    double mouseX = ((double) xMouse / 400.0) - 0.09;
-    double mouseY = ((double) (800 - yMouse) / 400.0) - 0.35;
+    // convert screen coordinates to simulation coordinates
+    double screenX = ((double) x/ 400.0) - 1;
+    double screenY = ((double) (800 - y) / 400.0) - 1;
+    double mouseX = ((double) xMouse / 400.0) - 1;
+    double mouseY = ((double) (800 - yMouse) / 400.0) - 1;
 
     if (sceneNum == 1)
     {
@@ -255,12 +259,17 @@ void glutMouseMotion(int x, int y)
           && screenY <= vertices[unconstrainedVertices[i]][1] + 0.03
           && screenY >= vertices[unconstrainedVertices[i]][1] - 0.03)
         {
+          printf("addforce\n");
+          printf("vertex %d: (%f,%f)\n", i, vertices[unconstrainedVertices[i]][0], vertices[unconstrainedVertices[i]][1]);
+          printf("screenx %f\n", screenX);
+          printf("screeny %f\n\n\n", screenY);
           triangleMesh.addSingleForce(VEC2(xDiff, -1*yDiff), unconstrainedVertices[i]);
         }
       }
     }
     else
     {
+      printf("else\n");
       for (int i = 0; i < vertices.size(); i++)
       {
         if (screenX <= vertices[i][0] + 0.04
@@ -268,6 +277,7 @@ void glutMouseMotion(int x, int y)
           && screenY <= vertices[i][1] + 0.03
           && screenY >= vertices[i][1] - 0.03)
         {
+          printf("addforce\n");
           triangleMesh.addBodyForce(VEC2(xDiff*2, -1*yDiff*2));
           triangleMesh.addSingleForce(VEC2(xDiff, -1*yDiff), i);
         }
@@ -296,16 +306,16 @@ void glutIdle()
     static int frame = 0;
     switch (scene) {
       case STRETCH:
-        triangleMesh.stretch2(0.01);
+        triangleMesh.stretch2(0.002);
         break;
       case RSHEAR:
-        triangleMesh.stepShearTest(0.01);
+        triangleMesh.stepShearTest(0.002);
         break;
       case LSHEAR:
-        triangleMesh.stepShearTest(-0.01);
+        triangleMesh.stepShearTest(-0.002);
         break;
       case SQUASH:
-        triangleMesh.stretch2(-0.01);
+        triangleMesh.stretch2(-0.002);
         break;
       case SINGLE:
         triangleMesh.addBodyForce(bodyForce);
@@ -326,12 +336,11 @@ void glutIdle()
         {
           triangleMesh.addBodyForce(bodyForce);
         }
-        triangleMesh.stepMotion(dt, bodyForce);
+        triangleMesh.stepMotion(dt, bodyForce, sceneNum);
       }
     }
     else
     {
-      printf("else\n");
       triangleMesh.stepQuasistatic();
     }
     frame++;
@@ -399,9 +408,15 @@ string toUpper(const string& input)
 ///////////////////////////////////////////////////////////////////////
 void readCommandLine(int argc, char** argv)
 {
-  if (argc > 1)
+  if (argc < 2)
   {
-    string sceneType(argv[1]);
+    cout << " invalid number of arguments. Args given: " << argc << ". need filenames" << endl;
+    exit(0);
+  }
+
+  if (argc > 2)
+  {
+    string sceneType(argv[2]);
     sceneType = toUpper(sceneType);
 
     if (sceneType.compare("LSHEAR") == 0)
@@ -420,14 +435,25 @@ void readCommandLine(int argc, char** argv)
       sceneNum = 0;
     }
 
-    if (argc > 2)
+    if (argc > 3)
     {
-      for(int x = 2; x < argc; x++)
+      for(int x = 3; x < argc; x++)
       {
         if (argv[x][1] == 'm')
           meshFlag = 1;
         else if (argv[x][1] == 'b')
           sceneNum = 1;
+        else if (argv[x][1] == 'q')
+        {
+          createBasis = true;
+          if( x + 1 == argc )
+          {
+            cout << " invalid number of arguments. Need an int after the -q flag" << endl;
+            exit(0);
+          }
+          basisCols = stoi(argv[x+1]);
+          x++;
+        }
       }
     }
   }
@@ -437,14 +463,74 @@ void readCommandLine(int argc, char** argv)
     sceneNum = 0;
   }
 
+  // if we are creating a basis, we must create a file with all of the deformations we will be using
+  // im not sure if this if=else statement will be kept later - i think ideally we should always be reducing and
+  // not necessarily creating the basis file ? but this is necessary for now if we want to run quasistatics
+  if(createBasis)
+  {
+    FILE* file = NULL;
+    int nVerts;
+    string filename = argv[1] + string(".node");
+    file = fopen(filename.c_str(), "r");
+    fscanf(file, "%i", &nVerts);
+    fclose(file);
+
+    filename = argv[1] + string(".basis");
+    file = fopen(filename.c_str(), "w");
+    fprintf(file, "%i %i\n", nVerts*2, 60);
+
+    for(int i = 0; i < 4; i++)
+    {
+      TRIANGLE_MESH basisBuild(poissonsRatio, youngsModulus);
+      basisBuild.buildBlob(1, argv[1], true, 0);
+      bodyForce[0] = 0;
+      bodyForce[1] = -0.3;
+      for(int j = 0; j < 15; j++)
+      {
+        switch(i) {
+          case 0:
+            basisBuild.stretch2(0.002);
+            break;
+          case 1:
+            basisBuild.stepShearTest(0.002);
+            break;
+          case 2:
+            basisBuild.stepShearTest(-0.002);
+            break;
+          case 3:
+            basisBuild.stretch2(-0.002);
+            break;
+        }
+        basisBuild.stepQuasistatic();
+        VECTOR displacements = basisBuild.getDisplacement();
+        int u_size = displacements.size();
+        // printf("nverts %i, all verts %i\n", u_size, nVerts);
+
+        for(int k = 0; k < u_size; k++)
+          fprintf(file, "%lf ", displacements[k]);
+
+        for(int k = 0; k < (nVerts*2) - u_size; k++)
+          fprintf(file, "%lf ", 0.00);
+
+        fprintf(file, "\n");
+      }
+    }
+    fclose(file);
+    triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
+  }
+  else
+  {
+    triangleMesh.buildBlob(sceneNum, argv[1], true, 0);
+  }
+
   // build the scene
-  triangleMesh.buildBlob(1.15, sceneNum);
+  // triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
   bodyForce[0] = 0;
   bodyForce[1] = -0.3;
 
-  triangleMesh.addWall(WALL(VEC2(1,0), VEC2(-0.09,0)));
-  triangleMesh.addWall(WALL(VEC2(-1,0), VEC2(1.89,0)));
-  triangleMesh.addWall(WALL(VEC2(0,1), VEC2(0,-0.35)));
+  triangleMesh.addWall(WALL(VEC2(1,0), VEC2(-0.98,0)));
+  triangleMesh.addWall(WALL(VEC2(-1,0), VEC2(0.98,0)));
+  triangleMesh.addWall(WALL(VEC2(0,1), VEC2(0,-0.95)));
 
 }
 
@@ -452,7 +538,7 @@ void readCommandLine(int argc, char** argv)
 ///////////////////////////////////////////////////////////////////////
 int main(int argc, char** argv)
 {
-  cout << " Usage: " << argv[0] << " <which scene> " << endl;
+  cout << " Usage: " << argv[0] << "<vertex filename> <which scene> <extra args>" << endl;
   cout << "\t Valid values: " << endl;
   cout << "\t\t <which test>: SINGLE, LSHEAR, RSHEAR, SQUASH, STRETCH, MOTION" << endl;
 
