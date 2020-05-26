@@ -481,7 +481,6 @@ void readCommandLine(int argc, char** argv)
 
     for(int i = 0; i < 4; i++)
     {
-      printf("test %i\n", i);
       TRIANGLE_MESH basisBuild(poissonsRatio, youngsModulus);
       basisBuild.buildBlob(1, argv[1], true, 0);
       bodyForce[0] = 0;

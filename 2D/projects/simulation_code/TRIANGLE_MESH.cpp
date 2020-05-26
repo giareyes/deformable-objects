@@ -308,7 +308,6 @@ void TRIANGLE_MESH::setMassMatrix(bool reduction)
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::basisNoTranslation(const char* filename, int basis_cols)
 {
-  printf("creating basis matrix\n");
   FILE* file = NULL;
   int rows;
   int cols;
@@ -416,32 +415,18 @@ void TRIANGLE_MESH::stretch2(const Real stretch)
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::createCoefs()
 {
-  printf("creating coefficients\n");
-
   MATRIX m(_vertices.size()*2,_vertices.size()*2);
-  printf("matrix allocated\n");
-
   MATRIX constTemp(_vertices.size()*2,_vertices.size()*2);
-  printf("matrix allocated\n");
-
   TENSOR3 cubq(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2);
-  printf("tensor 3 allocated\n");
-
   TENSOR3 quadl(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2);
-  printf("tensor 3 allocated\n");
-
   TENSOR4 tempQuad(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2,_vertices.size()*2);
-  printf("tensor 4 allocated\n");
-
   TENSOR4 temp(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2,_vertices.size()*2);
-  printf("tensor 4 allocated\n");
-  
+
   m.setZero();
   constTemp.setZero();
 
   int n_of_triangles = _triangles.size();
 
-  printf("space allocated - creating loop over %d triangles\n", n_of_triangles);
   for(int x = 0; x < n_of_triangles; x++)
   {
     //get our current triangle
@@ -594,24 +579,17 @@ void TRIANGLE_MESH::createCoefs()
     cubquad.clear();
   }
 
-  printf("push reduced basis through\n");
   // reduction matrix
   MATRIX transpose = _U.transpose();
 
   // set reduced coefficients for the cubic polynomial
 
   // linear term
-  // _linearCoef = m;
-
-  // if reduced:
   _linearCoef = transpose*(m*_U);
   m.resize(0,0);
 
 
   // cubic coefficient
-  // _cubicCoef = temp;
-
-  // if reduced:
   _cubicCoef = temp.modeFourProduct(transpose);
   temp.clear();
   _cubicCoef = _cubicCoef.modeThreeProduct(transpose);
@@ -619,9 +597,6 @@ void TRIANGLE_MESH::createCoefs()
   _cubicCoef = _cubicCoef.modeOneProduct(transpose);
 
   // quadratic coefficient of cubic polynomial
-  // _cubicquad = cubq;
-
-  // if reduced:
   _cubicquad = cubq.modeThreeProduct(transpose);
   cubq.clear();
   _cubicquad = _cubicquad.modeTwoProduct(transpose);
@@ -630,22 +605,16 @@ void TRIANGLE_MESH::createCoefs()
   // set reduced coefficients for quadratic polynomial
 
   // constant term
-  // _constCoef = constTemp;
   _constCoef = transpose*(constTemp*_U);
+  constTemp.resize(0,0);
 
   // linear term
-  // _quadlinear = quadl;
-
-  // if reduced:
   _quadlinear = quadl.modeThreeProduct(transpose);
   quadl.clear();
   _quadlinear = _quadlinear.modeTwoProduct(transpose);
   _quadlinear = _quadlinear.modeOneProduct(transpose);
 
   // quadratic term
-  // _quadraticCoef = tempQuad;
-
-  // if reduced:
   _quadraticCoef = tempQuad.modeFourProduct(transpose);
   tempQuad.clear();
   _quadraticCoef = _quadraticCoef.modeThreeProduct(transpose);
@@ -654,11 +623,6 @@ void TRIANGLE_MESH::createCoefs()
 
   // free memory if reduced
   transpose.resize(0,0);
-  temp.clear();
-  cubq.clear();
-  m.resize(0,0);
-
-  printf("coefficients created\n");
 }
 
 ///////////////////////////////////////////////////////////////////////
