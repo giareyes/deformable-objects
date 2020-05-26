@@ -1,4 +1,4 @@
 # convert an SVG image into a StVK simulation
 ./bin/svgToPoly ./data/circle.svg ./data/circle.poly
 ./bin/triangle ./data/circle.poly
-./bin/sim ./data/circle.1 MOTION -m -b -q 20
+./bin/sim ./data/circle.1 MOTION -m -b -q 40

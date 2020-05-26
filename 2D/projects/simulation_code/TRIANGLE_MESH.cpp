@@ -308,6 +308,7 @@ void TRIANGLE_MESH::setMassMatrix(bool reduction)
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::basisNoTranslation(const char* filename, int basis_cols)
 {
+  printf("creating basis matrix\n");
   FILE* file = NULL;
   int rows;
   int cols;
@@ -415,17 +416,32 @@ void TRIANGLE_MESH::stretch2(const Real stretch)
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::createCoefs()
 {
+  printf("creating coefficients\n");
+
   MATRIX m(_vertices.size()*2,_vertices.size()*2);
+  printf("matrix allocated\n");
+
   MATRIX constTemp(_vertices.size()*2,_vertices.size()*2);
+  printf("matrix allocated\n");
+
   TENSOR3 cubq(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2);
+  printf("tensor 3 allocated\n");
+
   TENSOR3 quadl(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2);
+  printf("tensor 3 allocated\n");
+
   TENSOR4 tempQuad(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2,_vertices.size()*2);
+  printf("tensor 4 allocated\n");
+
   TENSOR4 temp(_vertices.size()*2,_vertices.size()*2, _vertices.size()*2,_vertices.size()*2);
+  printf("tensor 4 allocated\n");
+  
   m.setZero();
   constTemp.setZero();
 
   int n_of_triangles = _triangles.size();
 
+  printf("space allocated - creating loop over %d triangles\n", n_of_triangles);
   for(int x = 0; x < n_of_triangles; x++)
   {
     //get our current triangle
@@ -578,6 +594,7 @@ void TRIANGLE_MESH::createCoefs()
     cubquad.clear();
   }
 
+  printf("push reduced basis through\n");
   // reduction matrix
   MATRIX transpose = _U.transpose();
 
@@ -640,6 +657,8 @@ void TRIANGLE_MESH::createCoefs()
   temp.clear();
   cubq.clear();
   m.resize(0,0);
+
+  printf("coefficients created\n");
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -933,11 +952,9 @@ bool TRIANGLE_MESH::stepQuasistatic()
   // VECTOR r2 = -1*(_f + reducedF);
 
   //step 5: compute x = K .inverse().eval()  * r
-  MATRIX inverse2 = K.inverse().eval();
-  VECTOR x2 = inverse2*r2;
-
-  // printf("inverse:\n");
-  // printMatrix(inverse2);
+  // MATRIX inverse2 = K.inverse().eval();
+  // VECTOR x2 = inverse2*r2;
+  VECTOR x2 = K.colPivHouseholderQr().solve(r2);
 
   //step 6: add solution x to displamcement vector _u
   _u += x2;
@@ -952,9 +969,6 @@ bool TRIANGLE_MESH::stepQuasistatic()
   _f.setZero();
   K.resize(0,0);
 
-  // static int counter = 0;
-  // cout << " Quasistatic step: " << counter << endl;
-  // counter++;
   return true;
 }
 
