@@ -15,7 +15,8 @@
 #endif
 
 #include "TRIANGLE_MESH.h"
-#include "STVK.h"
+// #include "STVK.h"
+#include "NEOHOOKEAN.h"
 #include "WALL.h"
 
 using namespace std;
@@ -25,7 +26,7 @@ int xScreenRes = 800;
 int yScreenRes = 800;
 
 // Text for the title bar of the window
-string windowLabel("Reduced-Order StVK Sim");
+string windowLabel("Reduced-Order Neo-Hookean Sim");
 
 // mouse tracking variables
 int xMouse         = -1;
@@ -543,6 +544,11 @@ int main(int argc, char** argv)
   cout << "\t\t <which test>: SINGLE, LSHEAR, RSHEAR, SQUASH, STRETCH, MOTION" << endl;
 
   readCommandLine(argc, argv);
+
+  // printf("-----------Finite Difference test on Startup------------\n");
+  // HessianDifference();
+  // PK1Difference();
+  // printf("---------------End Finite Difference test---------------\n");
 
   // initialize GLUT and GL
   glutInit(&argc, argv);

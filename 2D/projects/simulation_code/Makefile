@@ -9,7 +9,7 @@ LDFLAGS    = ${LDFLAGS_COMMON}
 EXECUTABLE = ../../bin/sim
 
 SOURCES    = simulation.cpp \
-						 STVK.cpp \
+						 NEOHOOKEAN.cpp \
 						 TENSOR3.cpp \
 						 TENSOR4.cpp \
 						 TRIANGLE_MESH.cpp \

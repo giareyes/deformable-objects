@@ -1,5 +1,6 @@
 #include "TRIANGLE_MESH.h"
-#include "STVK.h"
+// #include "STVK.h"
+#include "NEOHOOKEAN.h"
 #include <iostream>
 #include <fstream>
 
@@ -15,7 +16,8 @@ TRIANGLE_MESH::TRIANGLE_MESH(const Real poissonsRatio, const Real youngsModulus)
 
   const Real lambda = (0.25)*( E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu)));
   const Real mu = (0.25)*(E / (2.0 * (1 + nu)));
-  _material = new STVK(lambda, mu);
+  // _material = new STVK(lambda, mu);
+  _material = new NEOHOOKEAN(lambda, mu);
 }
 
 TRIANGLE_MESH::~TRIANGLE_MESH()
