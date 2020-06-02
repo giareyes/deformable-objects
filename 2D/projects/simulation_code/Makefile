@@ -4,12 +4,13 @@ COMPILER = g++
 
 # calls:
 CC         = g++
-CFLAGS     = ${CFLAGS_COMMON} -I ../../ -O3
+CFLAGS     = ${CFLAGS_COMMON} -I ../../ -I ../../src/ -O3 
 LDFLAGS    = ${LDFLAGS_COMMON}
 EXECUTABLE = ../../bin/sim
 
 SOURCES    = simulation.cpp \
 						 NEOHOOKEAN.cpp \
+						 STVK.cpp \
 						 TENSOR3.cpp \
 						 TENSOR4.cpp \
 						 TRIANGLE_MESH.cpp \

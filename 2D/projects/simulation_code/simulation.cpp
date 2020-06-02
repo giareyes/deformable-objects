@@ -15,7 +15,7 @@
 #endif
 
 #include "TRIANGLE_MESH.h"
-// #include "STVK.h"
+#include "STVK.h"
 #include "NEOHOOKEAN.h"
 #include "WALL.h"
 
