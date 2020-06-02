@@ -470,15 +470,9 @@ void readCommandLine(int argc, char** argv)
   if(createBasis)
   {
     FILE* file = NULL;
-    int nVerts;
-    string filename = argv[1] + string(".node");
-    file = fopen(filename.c_str(), "r");
-    fscanf(file, "%i", &nVerts);
-    fclose(file);
 
-    filename = argv[1] + string(".basis");
+    string filename = argv[1] + string(".basis");
     file = fopen(filename.c_str(), "w");
-    fprintf(file, "%i %i\n", nVerts*2, 60);
 
     for(int i = 0; i < 4; i++)
     {
@@ -505,27 +499,24 @@ void readCommandLine(int argc, char** argv)
         basisBuild.stepQuasistatic();
         VECTOR displacements = basisBuild.getDisplacement();
         int u_size = displacements.size();
-        // printf("nverts %i, all verts %i\n", u_size, nVerts);
+        if( i == 0 && j == 0 ) fprintf(file, "%i %i\n", u_size, 60);
 
         for(int k = 0; k < u_size; k++)
           fprintf(file, "%lf ", displacements[k]);
-
-        for(int k = 0; k < (nVerts*2) - u_size; k++)
-          fprintf(file, "%lf ", 0.00);
 
         fprintf(file, "\n");
       }
     }
     fclose(file);
+    // build the scene
     triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
   }
   else
   {
+    // build the scene
     triangleMesh.buildBlob(sceneNum, argv[1], true, 0);
   }
 
-  // build the scene
-  // triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
   bodyForce[0] = 0;
   bodyForce[1] = -0.3;
 
