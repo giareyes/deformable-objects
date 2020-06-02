@@ -29,7 +29,7 @@ TRIANGLE::TRIANGLE(MATERIAL* material, const vector<VEC2*>& vertices) :
     // this is equal to (pfpu)T *(mu*I - (lambda + mu)d(detF)/dF)* (pfpu)
     _pfpu = pFpuVectorized();
 
-    if(MATMODEL == 1) // if we're working with NEOHOOKEAN model
+    if(MATMODEL != 0) // if we're working with NEOHOOKEAN model
     {
       MATRIX constMatrix(4,4);
       constMatrix.setIdentity();
