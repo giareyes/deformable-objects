@@ -20,10 +20,12 @@ TRIANGLE_MESH::TRIANGLE_MESH(const Real poissonsRatio, const Real youngsModulus)
   if(MATMODEL == 0)
   {
     _material = new STVK(lambda, mu);
+    printf("using StVK model...\n");
   }
   else
   {
     _material = new NEOHOOKEAN(lambda, mu);
+    printf("using Neo-Hookean model...\n");
   }
 }
 
@@ -868,7 +870,7 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
   qTou();
 
   // step 8: update all node positions w new displacement vector
-  int unconstrained = _unconstrainedVertices.size();
+  // int unconstrained = _unconstrainedVertices.size();
   uScatter();
 
   // for(int x = 0; x < _constrainedVertices.size(); x++)
