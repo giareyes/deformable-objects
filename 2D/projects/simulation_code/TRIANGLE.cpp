@@ -1,5 +1,5 @@
 #include "TRIANGLE.h"
-
+#define MATMODEL 1 // determines what kind of material we are using. 0 = STVK, 1 = NEOHOOKEAN
 #include <iostream>
 using namespace std;
 
@@ -28,103 +28,260 @@ TRIANGLE::TRIANGLE(MATERIAL* material, const vector<VEC2*>& vertices) :
     // create the constant coefficient matrix below:
     // this is equal to (pfpu)T *(mu*I - (lambda + mu)d(detF)/dF)* (pfpu)
     _pfpu = pFpuVectorized();
-    MATRIX constMatrix(4,4);
-    constMatrix.setIdentity();
-    constMatrix = constMatrix*_mu;
-    constMatrix(0,3) = -1*(_lambda + _mu);
-    constMatrix(1,2) = (_lambda + _mu);
-    constMatrix(2,1) = (_lambda + _mu);
-    constMatrix(3,0) = -1*(_lambda + _mu);
 
-    _constCoef = _pfpu.transpose() * constMatrix * _pfpu;
-    constMatrix.resize(0,0);
-
-    // multiply by -1*restArea
-    _constCoef = -1*restArea()*_constCoef;
-
-    // create the _quadraticCoef for the stiffness matrix polynomial
-    // it must be multiplied in all dimensions by (pfpu)^T
-    TENSOR4 quad(4,4,4,4);
-    // column 0
-    // row 0
-    quad._tensor[0]._tensor[0](3,3) = 1;
-    // row 1
-    quad._tensor[0]._tensor[1](3,2) = -1;
-    // row 2
-    quad._tensor[0]._tensor[2](3,1) = -1;
-    // row 3
-    quad._tensor[0]._tensor[3](2,1) = -1;
-    quad._tensor[0]._tensor[3](3,0) = 2;
-
-    // column 1
-    // row 0
-    quad._tensor[1]._tensor[0](2,3) = -1;
-    // row 1
-    quad._tensor[1]._tensor[1](2,2) = 1;
-    // row 2
-    quad._tensor[1]._tensor[2](2,1) = 2;
-    quad._tensor[1]._tensor[2](3,0) = -1;
-    // row 3
-    quad._tensor[1]._tensor[3](2,0) = -1;
-
-    // column 2
-    // row 0
-    quad._tensor[2]._tensor[0](1,3) = -1;
-    // row 1
-    quad._tensor[2]._tensor[1](0,3) = -1;
-    quad._tensor[2]._tensor[1](1,2) = 2;
-    // row 2
-    quad._tensor[2]._tensor[2](1,1) = 1;
-    // row 3
-    quad._tensor[2]._tensor[3](1,0) = -1;
-
-    // column 3
-    // row 0
-    quad._tensor[3]._tensor[0](0,3) = 2;
-    quad._tensor[3]._tensor[0](1,2) = -1;
-    // row 1
-    quad._tensor[3]._tensor[1](0,2) = -1;
-    // row 2
-    quad._tensor[3]._tensor[2](0,1) = -1;
-    // row 3
-    quad._tensor[3]._tensor[3](0,0) = 1;
-
-    _quadraticCoef = quad;
-    _quadraticCoef *= (-1*restArea()*_lambda);
-
-    // multiply in all dimensions by (pfpu)^T
-    MATRIX pfputrans = _pfpu.transpose();
-    _quadraticCoef = _quadraticCoef.modeFourProduct(pfputrans);
-    _quadraticCoef = _quadraticCoef.modeThreeProduct(pfputrans);
-    _quadraticCoef = _quadraticCoef.modeTwoProduct(pfputrans);
-    _quadraticCoef = _quadraticCoef.modeOneProduct(pfputrans);
-
-    // create the cubic term coefficient for the internal force polynomial.
-    // again, all dimensions must be multiplied by (pfpu)^T
-    TENSOR4 cubic(4,4,4,4);
-
-    for(int i = 0; i < 4; i++)
+    if(MATMODEL == 1) // if we're working with NEOHOOKEAN model
     {
-      cubic._tensor[i]._tensor[i](3-i, 3-i) = 1;
+      MATRIX constMatrix(4,4);
+      constMatrix.setIdentity();
+      constMatrix = constMatrix*_mu;
+      constMatrix(0,3) = -1*(_lambda + _mu);
+      constMatrix(1,2) = (_lambda + _mu);
+      constMatrix(2,1) = (_lambda + _mu);
+      constMatrix(3,0) = -1*(_lambda + _mu);
+
+      _constCoef = _pfpu.transpose() * constMatrix * _pfpu;
+      constMatrix.resize(0,0);
+
+      // multiply by -1*restArea
+      _constCoef = -1*restArea()*_constCoef;
+
+      // create the _quadraticCoef for the stiffness matrix polynomial
+      // it must be multiplied in all dimensions by (pfpu)^T
+      TENSOR4 quad(4,4,4,4);
+      // column 0
+      // row 0
+      quad._tensor[0]._tensor[0](3,3) = 1;
+      // row 1
+      quad._tensor[0]._tensor[1](3,2) = -1;
+      // row 2
+      quad._tensor[0]._tensor[2](3,1) = -1;
+      // row 3
+      quad._tensor[0]._tensor[3](2,1) = -1;
+      quad._tensor[0]._tensor[3](3,0) = 2;
+
+      // column 1
+      // row 0
+      quad._tensor[1]._tensor[0](2,3) = -1;
+      // row 1
+      quad._tensor[1]._tensor[1](2,2) = 1;
+      // row 2
+      quad._tensor[1]._tensor[2](2,1) = 2;
+      quad._tensor[1]._tensor[2](3,0) = -1;
+      // row 3
+      quad._tensor[1]._tensor[3](2,0) = -1;
+
+      // column 2
+      // row 0
+      quad._tensor[2]._tensor[0](1,3) = -1;
+      // row 1
+      quad._tensor[2]._tensor[1](0,3) = -1;
+      quad._tensor[2]._tensor[1](1,2) = 2;
+      // row 2
+      quad._tensor[2]._tensor[2](1,1) = 1;
+      // row 3
+      quad._tensor[2]._tensor[3](1,0) = -1;
+
+      // column 3
+      // row 0
+      quad._tensor[3]._tensor[0](0,3) = 2;
+      quad._tensor[3]._tensor[0](1,2) = -1;
+      // row 1
+      quad._tensor[3]._tensor[1](0,2) = -1;
+      // row 2
+      quad._tensor[3]._tensor[2](0,1) = -1;
+      // row 3
+      quad._tensor[3]._tensor[3](0,0) = 1;
+
+      _quadraticCoef = quad;
+      _quadraticCoef *= (-1*restArea()*_lambda);
+
+      // multiply in all dimensions by (pfpu)^T
+      MATRIX pfputrans = _pfpu.transpose();
+      _quadraticCoef = _quadraticCoef.modeFourProduct(pfputrans);
+      _quadraticCoef = _quadraticCoef.modeThreeProduct(pfputrans);
+      _quadraticCoef = _quadraticCoef.modeTwoProduct(pfputrans);
+      _quadraticCoef = _quadraticCoef.modeOneProduct(pfputrans);
+
+      // create the cubic term coefficient for the internal force polynomial.
+      // again, all dimensions must be multiplied by (pfpu)^T
+      TENSOR4 cubic(4,4,4,4);
+
+      for(int i = 0; i < 4; i++)
+      {
+        cubic._tensor[i]._tensor[i](3-i, 3-i) = 1;
+      }
+
+      cubic._tensor[0]._tensor[1](3, 2) = -1;
+      cubic._tensor[1]._tensor[0](2, 3) = -1;
+
+      cubic._tensor[2]._tensor[3](1, 0) = -1;
+      cubic._tensor[3]._tensor[2](0, 1) = -1;
+
+      _cubicCoef = cubic;
+      _cubicCoef *= (-1*restArea()*_lambda);
+
+      // multiply in all dimensions by (pfpu)^T
+      _cubicCoef = _cubicCoef.modeFourProduct(pfputrans);
+      _cubicCoef = _cubicCoef.modeThreeProduct(pfputrans);
+      _cubicCoef = _cubicCoef.modeTwoProduct(pfputrans);
+      _cubicCoef = _cubicCoef.modeOneProduct(pfputrans);
+
+      // we no longer need this, so free memeory!
+      pfputrans.resize(0,0);
     }
+    else // else we are working with StVK model
+    {
+      _constCoef = _pfpu.transpose() * _pfpu;
 
-    cubic._tensor[0]._tensor[1](3, 2) = -1;
-    cubic._tensor[1]._tensor[0](2, 3) = -1;
+      // multiply by (-4*mu - 4*lambda)*-1*restArea
+      _constCoef = restArea()*(4*_mu + 4*_lambda)*_constCoef;
 
-    cubic._tensor[2]._tensor[3](1, 0) = -1;
-    cubic._tensor[3]._tensor[2](0, 1) = -1;
+      // create the _quadraticCoef
+      TENSOR4 quad(4,4,4,4);
+      // column 0
+      // row 0
+      quad._tensor[0]._tensor[0](0,0) = 3;
+      quad._tensor[0]._tensor[0](1,1) = 1;
+      quad._tensor[0]._tensor[0](2,2) = 1;
+      // row 1
+      quad._tensor[0]._tensor[1](0,1) = 2;
+      quad._tensor[0]._tensor[1](2,3) = 1;
+      // row 2
+      quad._tensor[0]._tensor[2](0,2) = 2;
+      quad._tensor[0]._tensor[2](1,3) = 1;
+      // row 3
+      quad._tensor[0]._tensor[3](2,1) = 1;
 
-    _cubicCoef = cubic;
-    _cubicCoef *= (-1*restArea()*_lambda);
+      // column 1
+      // row 0
+      quad._tensor[1]._tensor[0](1,0) = 2;
+      quad._tensor[1]._tensor[0](3,2) = 1;
+      // row 1
+      quad._tensor[1]._tensor[1](0,0) = 1;
+      quad._tensor[1]._tensor[1](1,1) = 3;
+      quad._tensor[1]._tensor[1](3,3) = 1;
+      // row 2
+      quad._tensor[1]._tensor[2](3,0) = 1;
+      // row 3
+      quad._tensor[1]._tensor[3](0,2) = 1;
+      quad._tensor[1]._tensor[3](1,3) = 2;
 
-    // multiply in all dimensions by (pfpu)^T
-    _cubicCoef = _cubicCoef.modeFourProduct(pfputrans);
-    _cubicCoef = _cubicCoef.modeThreeProduct(pfputrans);
-    _cubicCoef = _cubicCoef.modeTwoProduct(pfputrans);
-    _cubicCoef = _cubicCoef.modeOneProduct(pfputrans);
+      // column 2
+      // row 0
+      quad._tensor[2]._tensor[0](2,0) = 2;
+      quad._tensor[2]._tensor[0](3,1) = 1;
+      // row 1
+      quad._tensor[2]._tensor[1](0,3) = 1;
+      // row 2
+      quad._tensor[2]._tensor[2](0,0) = 1;
+      quad._tensor[2]._tensor[2](2,2) = 3;
+      quad._tensor[2]._tensor[2](3,3) = 1;
+      // row 3
+      quad._tensor[2]._tensor[3](0,1) = 1;
+      quad._tensor[2]._tensor[3](2,3) = 2;
 
-    // we no longer need this, so free memeory!
-    pfputrans.resize(0,0);
+      // column 3
+      // row 0
+      quad._tensor[3]._tensor[0](1,2) = 1;
+      // row 1
+      quad._tensor[3]._tensor[1](2,0) = 1;
+      quad._tensor[3]._tensor[1](3,1) = 2;
+      // row 2
+      quad._tensor[3]._tensor[2](1,0) = 1;
+      quad._tensor[3]._tensor[2](3,2) = 2;
+      // row 3
+      quad._tensor[3]._tensor[3](1,1) = 1;
+      quad._tensor[3]._tensor[3](2,2) = 1;
+      quad._tensor[3]._tensor[3](3,3) = 3;
+
+      _quadraticCoef = quad;
+      _quadraticCoef *= (-1*restArea()*4*_mu);
+
+      TENSOR4 quadLambda(4,4,4,4);
+      // column 0
+      // row 0
+      quadLambda._tensor[0]._tensor[0].setIdentity();
+      quadLambda._tensor[0]._tensor[0](0,0) = 3;
+
+      // column 1
+      //row 0
+      quadLambda._tensor[1]._tensor[0](0,1) = 2;
+      quadLambda._tensor[1]._tensor[0](1,0) = 2;
+
+      //row 1
+      quadLambda._tensor[1]._tensor[1].setIdentity();
+      quadLambda._tensor[1]._tensor[1](1,1) = 3;
+
+      // column 2
+      //row 0
+      quadLambda._tensor[2]._tensor[0](0,2) = 2;
+      quadLambda._tensor[2]._tensor[0](2,0) = 2;
+
+      //row 1
+      quadLambda._tensor[2]._tensor[1](1,2) = 2;
+      quadLambda._tensor[2]._tensor[1](2,1) = 2;
+
+      //row 2
+      quadLambda._tensor[2]._tensor[2].setIdentity();
+      quadLambda._tensor[2]._tensor[2](2,2) = 3;
+
+      // column 3
+      //row 0
+      quadLambda._tensor[3]._tensor[0](0,3) = 2;
+      quadLambda._tensor[3]._tensor[0](3,0) = 2;
+
+      //row 1
+      quadLambda._tensor[3]._tensor[1](1,3) = 2;
+      quadLambda._tensor[3]._tensor[1](3,1) = 2;
+
+      //row 2
+      quadLambda._tensor[3]._tensor[2](2,3) = 2;
+      quadLambda._tensor[3]._tensor[2](3,2) = 2;
+
+      //row 3
+      quadLambda._tensor[3]._tensor[3].setIdentity();
+      quadLambda._tensor[3]._tensor[3](3,3) = 3;
+
+      quadLambda *= (-1*restArea()*2*_lambda);
+
+      _quadraticCoef += quadLambda;
+      quadLambda.clear();
+
+      MATRIX pfputrans = _pfpu.transpose();
+      _quadraticCoef = _quadraticCoef.modeFourProduct(pfputrans);
+      _quadraticCoef = _quadraticCoef.modeThreeProduct(pfputrans);
+      _quadraticCoef = _quadraticCoef.modeTwoProduct(pfputrans);
+      _quadraticCoef = _quadraticCoef.modeOneProduct(pfputrans);
+
+      TENSOR4 cubic(4,4,4,4);
+      TENSOR4 cubic_lambda(4,4,4,4);
+
+      for(int i = 0; i < 4; i++)
+      {
+        cubic_lambda._tensor[i]._tensor[i].setIdentity();
+        cubic._tensor[i]._tensor[i].setIdentity();
+        cubic._tensor[i]._tensor[i](3-i, 3-i) = 0;
+      }
+
+      cubic._tensor[0]._tensor[1](3, 2) = 1;
+      cubic._tensor[1]._tensor[0](2, 3) = 1;
+
+      cubic._tensor[2]._tensor[3](1, 0) = 1;
+      cubic._tensor[3]._tensor[2](0, 1) = 1;
+
+      _cubicCoef = cubic;
+      _cubicCoef *= (-1*restArea()*4*_mu);
+      cubic_lambda *= (-1*restArea()*2*_lambda);
+      _cubicCoef += cubic_lambda;
+
+      _cubicCoef = _cubicCoef.modeFourProduct(pfputrans);
+      _cubicCoef = _cubicCoef.modeThreeProduct(pfputrans);
+      _cubicCoef = _cubicCoef.modeTwoProduct(pfputrans);
+      _cubicCoef = _cubicCoef.modeOneProduct(pfputrans);
+
+      pfputrans.resize(0,0);
+      cubic_lambda.clear();
+    }
 
     // add on the terms that are created when we shift our equations to handle displacement instead of position
 
