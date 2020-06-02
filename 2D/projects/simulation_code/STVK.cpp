@@ -106,106 +106,106 @@ Real STVK::psi(const MATRIX2& F)
   return term1 + term2;
 }
 
-//finite difference method for the hessian matrix
-void HessianDifference()
-{
-  MATRIX2 randomizedF;
-  randomizedF(0,0) = rand()%10;
-  randomizedF(0,1) = rand()%10;
-  randomizedF(1,0) = rand()%10;
-  randomizedF(1,1) = rand()%10;
-  Real nu = 0.4;
-  Real E = 1;
-
-  const Real lambda = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu));
-  const Real mu = E / (2.0 * (1 + nu));
-
-  STVK* STVKAnalytic = new STVK(lambda, mu);
-
-  MATRIX hessianAnalytic = STVKAnalytic->DPDF(randomizedF);
-  long double epsilon = 0.1;
-  for(int x = 0; x < 6; x++)
-  {
-    Matrix4d hessianNumerical;
-    Matrix4d matrixDiff;
-    long double hessianDiff;
-
-    MATRIX2 initial = randomizedF;
-    MATRIX2 forceInitial = STVKAnalytic->PK1(initial);
-    for(int i = 0; i < 2; i++)
-    {
-      MATRIX2 perturbed = randomizedF;
-      perturbed(i,0) += epsilon;
-      MATRIX2 forcePerturbed = STVKAnalytic->PK1(perturbed);
-      MATRIX2 finiteDiff = (1/epsilon)*(forcePerturbed - forceInitial);
-      hessianNumerical.col(i) = vectorize(finiteDiff);
-    }
-    for(int i = 0; i < 2; i++)
-    {
-      MATRIX2 perturbed = randomizedF;
-      perturbed(i,1) += epsilon;
-      MATRIX2 forcePerturbed = STVKAnalytic->PK1(perturbed);
-      MATRIX2 finiteDiff = (1/epsilon)*(forcePerturbed - forceInitial);
-      hessianNumerical.col(i+2) = vectorize(finiteDiff);
-    }
-
-    matrixDiff = hessianAnalytic - hessianNumerical;
-    hessianDiff = matrixDiff.norm()/hessianAnalytic.norm();
-
-    printf("hessianDiff: %Lf, epsilon: %Lf \n", hessianDiff, epsilon);
-    epsilon = epsilon*0.1;
-  }
-}
-
-//finite difference method for the PK1
-void PK1Difference()
-{
-  MATRIX2 randomizedF;
-  randomizedF(0,0) = rand()%10;
-  randomizedF(0,1) = rand()%10;
-  randomizedF(1,0) = rand()%10;
-  randomizedF(1,1) = rand()%10;
-  Real nu = 0.4;
-  Real E = 1;
-
-  const Real lambda = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu));
-  const Real mu = E / (2.0 * (1 + nu));
-
-  STVK* STVKAnalytic = new STVK(lambda, mu);
-
-  MATRIX PK1Analytic = STVKAnalytic->PK1(randomizedF);
-
-  long double epsilon = 0.1;
-  for(int x = 0; x < 6; x++)
-  {
-    MATRIX2 PK1Numerical;
-    MATRIX2 matrixDiff;
-    long double PK1Diff;
-
-    MATRIX2 initial = randomizedF;
-    Real forceInitial = STVKAnalytic->psi(initial);
-    for(int i = 0; i < 2; i++)
-    {
-      MATRIX2 perturbed = randomizedF;
-      perturbed(i,0) += epsilon;
-      Real forcePerturbed = STVKAnalytic->psi(perturbed);
-      Real finiteDiff = (1/epsilon)*(forcePerturbed - forceInitial);
-      PK1Numerical(i,0) = finiteDiff;
-    }
-
-    for(int i = 0; i < 2; i++)
-    {
-      MATRIX2 perturbed = randomizedF;
-      perturbed(i,1) += epsilon;
-      Real forcePerturbed = STVKAnalytic->psi(perturbed);
-      Real finiteDiff = (1/epsilon)*(forcePerturbed - forceInitial);
-      PK1Numerical(i,1) = finiteDiff;
-    }
-
-    matrixDiff = PK1Analytic - PK1Numerical;
-    PK1Diff = matrixDiff.norm()/PK1Analytic.norm();
-
-    printf("PK1Diff: %Lf, epsilon: %Lf \n", PK1Diff, epsilon);
-    epsilon = epsilon*0.1;
-  }
-}
+// //finite difference method for the hessian matrix
+// void HessianDifference()
+// {
+//   MATRIX2 randomizedF;
+//   randomizedF(0,0) = rand()%10;
+//   randomizedF(0,1) = rand()%10;
+//   randomizedF(1,0) = rand()%10;
+//   randomizedF(1,1) = rand()%10;
+//   Real nu = 0.4;
+//   Real E = 1;
+//
+//   const Real lambda = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu));
+//   const Real mu = E / (2.0 * (1 + nu));
+//
+//   STVK* STVKAnalytic = new STVK(lambda, mu);
+//
+//   MATRIX hessianAnalytic = STVKAnalytic->DPDF(randomizedF);
+//   long double epsilon = 0.1;
+//   for(int x = 0; x < 6; x++)
+//   {
+//     Matrix4d hessianNumerical;
+//     Matrix4d matrixDiff;
+//     long double hessianDiff;
+//
+//     MATRIX2 initial = randomizedF;
+//     MATRIX2 forceInitial = STVKAnalytic->PK1(initial);
+//     for(int i = 0; i < 2; i++)
+//     {
+//       MATRIX2 perturbed = randomizedF;
+//       perturbed(i,0) += epsilon;
+//       MATRIX2 forcePerturbed = STVKAnalytic->PK1(perturbed);
+//       MATRIX2 finiteDiff = (1/epsilon)*(forcePerturbed - forceInitial);
+//       hessianNumerical.col(i) = vectorize(finiteDiff);
+//     }
+//     for(int i = 0; i < 2; i++)
+//     {
+//       MATRIX2 perturbed = randomizedF;
+//       perturbed(i,1) += epsilon;
+//       MATRIX2 forcePerturbed = STVKAnalytic->PK1(perturbed);
+//       MATRIX2 finiteDiff = (1/epsilon)*(forcePerturbed - forceInitial);
+//       hessianNumerical.col(i+2) = vectorize(finiteDiff);
+//     }
+//
+//     matrixDiff = hessianAnalytic - hessianNumerical;
+//     hessianDiff = matrixDiff.norm()/hessianAnalytic.norm();
+//
+//     printf("hessianDiff: %Lf, epsilon: %Lf \n", hessianDiff, epsilon);
+//     epsilon = epsilon*0.1;
+//   }
+// }
+//
+// //finite difference method for the PK1
+// void PK1Difference()
+// {
+//   MATRIX2 randomizedF;
+//   randomizedF(0,0) = rand()%10;
+//   randomizedF(0,1) = rand()%10;
+//   randomizedF(1,0) = rand()%10;
+//   randomizedF(1,1) = rand()%10;
+//   Real nu = 0.4;
+//   Real E = 1;
+//
+//   const Real lambda = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu));
+//   const Real mu = E / (2.0 * (1 + nu));
+//
+//   STVK* STVKAnalytic = new STVK(lambda, mu);
+//
+//   MATRIX PK1Analytic = STVKAnalytic->PK1(randomizedF);
+//
+//   long double epsilon = 0.1;
+//   for(int x = 0; x < 6; x++)
+//   {
+//     MATRIX2 PK1Numerical;
+//     MATRIX2 matrixDiff;
+//     long double PK1Diff;
+//
+//     MATRIX2 initial = randomizedF;
+//     Real forceInitial = STVKAnalytic->psi(initial);
+//     for(int i = 0; i < 2; i++)
+//     {
+//       MATRIX2 perturbed = randomizedF;
+//       perturbed(i,0) += epsilon;
+//       Real forcePerturbed = STVKAnalytic->psi(perturbed);
+//       Real finiteDiff = (1/epsilon)*(forcePerturbed - forceInitial);
+//       PK1Numerical(i,0) = finiteDiff;
+//     }
+//
+//     for(int i = 0; i < 2; i++)
+//     {
+//       MATRIX2 perturbed = randomizedF;
+//       perturbed(i,1) += epsilon;
+//       Real forcePerturbed = STVKAnalytic->psi(perturbed);
+//       Real finiteDiff = (1/epsilon)*(forcePerturbed - forceInitial);
+//       PK1Numerical(i,1) = finiteDiff;
+//     }
+//
+//     matrixDiff = PK1Analytic - PK1Numerical;
+//     PK1Diff = matrixDiff.norm()/PK1Analytic.norm();
+//
+//     printf("PK1Diff: %Lf, epsilon: %Lf \n", PK1Diff, epsilon);
+//     epsilon = epsilon*0.1;
+//   }
+// }

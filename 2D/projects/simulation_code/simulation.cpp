@@ -16,6 +16,7 @@
 
 #include "TRIANGLE_MESH.h"
 #include "STVK.h"
+#include "NEOHOOKEAN.h"
 #include "WALL.h"
 
 using namespace std;
@@ -25,7 +26,7 @@ int xScreenRes = 800;
 int yScreenRes = 800;
 
 // Text for the title bar of the window
-string windowLabel("Reduced-Order StVK Sim");
+string windowLabel("Reduced-Order Neo-Hookean Sim");
 
 // mouse tracking variables
 int xMouse         = -1;
@@ -469,15 +470,9 @@ void readCommandLine(int argc, char** argv)
   if(createBasis)
   {
     FILE* file = NULL;
-    int nVerts;
-    string filename = argv[1] + string(".node");
-    file = fopen(filename.c_str(), "r");
-    fscanf(file, "%i", &nVerts);
-    fclose(file);
 
-    filename = argv[1] + string(".basis");
+    string filename = argv[1] + string(".basis");
     file = fopen(filename.c_str(), "w");
-    fprintf(file, "%i %i\n", nVerts*2, 60);
 
     for(int i = 0; i < 4; i++)
     {
@@ -504,27 +499,24 @@ void readCommandLine(int argc, char** argv)
         basisBuild.stepQuasistatic();
         VECTOR displacements = basisBuild.getDisplacement();
         int u_size = displacements.size();
-        // printf("nverts %i, all verts %i\n", u_size, nVerts);
+        if( i == 0 && j == 0 ) fprintf(file, "%i %i\n", u_size, 60);
 
         for(int k = 0; k < u_size; k++)
           fprintf(file, "%lf ", displacements[k]);
-
-        for(int k = 0; k < (nVerts*2) - u_size; k++)
-          fprintf(file, "%lf ", 0.00);
 
         fprintf(file, "\n");
       }
     }
     fclose(file);
+    // build the scene
     triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
   }
   else
   {
+    // build the scene
     triangleMesh.buildBlob(sceneNum, argv[1], true, 0);
   }
 
-  // build the scene
-  // triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
   bodyForce[0] = 0;
   bodyForce[1] = -0.3;
 
@@ -543,6 +535,11 @@ int main(int argc, char** argv)
   cout << "\t\t <which test>: SINGLE, LSHEAR, RSHEAR, SQUASH, STRETCH, MOTION" << endl;
 
   readCommandLine(argc, argv);
+
+  // printf("-----------Finite Difference test on Startup------------\n");
+  // HessianDifference();
+  // PK1Difference();
+  // printf("---------------End Finite Difference test---------------\n");
 
   // initialize GLUT and GL
   glutInit(&argc, argv);

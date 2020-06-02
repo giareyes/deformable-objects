@@ -65,13 +65,16 @@ private:
 
   MATRIX2 _Dm;
   MATRIX _pfpu;
-  MATRIX6 _linearCoef;
-  MATRIX6 _constCoef;
 
-  TENSOR4 _quadraticCoef;
+  // polynomial constants for internal force
+  MATRIX6 _linearCoef;
   TENSOR3 _cubic2;
-  TENSOR3 _quad2;
   TENSOR4 _cubicCoef;
+
+  //polynomial constants for stiffness matrix
+  MATRIX6 _constCoef;
+  TENSOR3 _quad2;
+  TENSOR4 _quadraticCoef;
 
   // material model
   MATERIAL* _material;
