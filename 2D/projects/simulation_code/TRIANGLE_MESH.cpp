@@ -15,17 +15,19 @@ TRIANGLE_MESH::TRIANGLE_MESH(const Real poissonsRatio, const Real youngsModulus)
   const Real E = youngsModulus;
   const Real nu = poissonsRatio;
 
-  const Real lambda = (0.25)*( E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu)));
-  const Real mu = (0.25)*(E / (2.0 * (1 + nu)));
   if(MATMODEL == 0)
   {
+    const Real lambda = (0.25)*( E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu)));
+    const Real mu = (0.25)*(E / (2.0 * (1 + nu)));
     _material = new STVK(lambda, mu);
     printf("using StVK model...\n");
   }
   else
   {
+    const Real lambda = (0.5)*( E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu)));
+    const Real mu = (0.5)*(E / (2.0 * (1 + nu)));
     _material = new NEOHOOKEAN(lambda, mu);
-    printf("using Neo-Hookean model...\n");
+    printf("using Neo-Hookean model with lambda: %f, mu: %f\n", lambda, mu);
   }
 }
 

@@ -50,13 +50,13 @@ float zoom = 2.0;
 
 //Real poissonsRatio = 0.0;
 // old:
-Real poissonsRatio = 0.4;
-Real youngsModulus = 1.0;
+// Real poissonsRatio = 0.4;
+// Real youngsModulus = 1.0;
 int basisCols = 0;
 
 // testing:
-// Real poissonsRatio = 0.4;
-// Real youngsModulus = 0.8;
+Real poissonsRatio = 0.49;
+Real youngsModulus = 1.0;
 
 TRIANGLE_MESH triangleMesh(poissonsRatio, youngsModulus);
 VEC2 bodyForce;
