@@ -143,7 +143,7 @@ This works exactly as it seems like it would. For $a \in \mathbb{R}$, $\bm{X} \i
 When a tensor is multiplied by a vector, its order reduces by 1. An n-mode vector product of a tensor $\bm{X} \in \mathbb{R}^{I_1 \times I_2 \times ... \times I_N}$ with a vector $\bm{v} \in \mathbb{R}^{I_n}$ is denoted by $\bm{X} \bar{\times}_n \bm{v}$. Element-wise,
 
 \begin{equation}
-(\bm{X} \bar{\times}_n \bm{v} )_{i_1, ..., i_{n-1}, i{n+1}, ..., i_N} = \sum_{i_n = 1}^{I_n} x_{i_1, i_2, ..., i_N}\cdot v_{i_n}
+(\bm{X} \bar{\times}_n \bm{v} )_{i_1, ..., i_{n-1}, i_{n+1}, ..., i_N} = \sum_{i_n = 1}^{I_n} x_{i_1, i_2, ..., i_N}\cdot v_{i_n}
 \end{equation}
 
 So the resulting tensor $(\bm{X} \bar{\times}_n \bm{v} ) \in \mathbb{R}^{I_1 \times ... \times I_{n-1} \times I_{n+1} \times ... \times I_N}$. A visual representation of a 3-mode vector product can be seen in Figure~\ref{fig_ex3.png}.
@@ -160,7 +160,7 @@ This is an important rule that will be used later.
 When a tensor is multiplied by a matrix, one of its dimensions changes. An n-mode matrix product of a tensor $\bm{X} \in \mathbb{R}^{I_1 \times I_2 \times ... \times I_N}$ with a matrix $\bm{U} \in \mathbb{R}^{J \times I_n}$ is denoted by $\bm{X} \times_n \bm{U}$. Element-wise, this multiplication results in:
 
 \begin{equation}
-(\bm{X} \times_n \bm{U} )_{i_1, ..., i_{n-1}, j, i{n+1}, ..., i_N} = \sum_{i_n = 1}^{I_n} x_{i_1, i_2, ..., i_N}\cdot u_{j,i_n}
+(\bm{X} \times_n \bm{U} )_{i_1, ..., i_{n-1}, j, i_{n+1}, ..., i_N} = \sum_{i_n = 1}^{I_n} x_{i_1, i_2, ..., i_N}\cdot u_{j,i_n}
 \end{equation}
 
 \noindent and the resulting tensor $(\bm{X} \times_n \bm{U} ) \in \mathbb{R}^{I_1 \times ... \times I_{n-1} \times J \times I_{n+1} \times ... \times I_N}$.

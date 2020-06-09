@@ -422,15 +422,18 @@ void TRIANGLE_MESH::stretch2(const Real stretch)
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::createCoefs()
 {
-  MATRIX m(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
-  MATRIX constTemp(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
-  TENSOR3 cubq(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2, _unconstrainedVertices.size()*2);
-  TENSOR3 quadl(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2, _unconstrainedVertices.size()*2);
-  TENSOR4 tempQuad(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2, _unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
-  TENSOR4 temp(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2, _unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
+  int reduced = _q.size();
 
-  m.setZero();
-  constTemp.setZero();
+  TENSOR4 temp(reduced, reduced, reduced, reduced); //cubic term for internal force
+  TENSOR3 cubq(reduced, reduced, reduced); //quadratic term for internal force
+  _linearCoef.resize(reduced, reduced); // linear term for internal force equation
+
+  TENSOR4 tempQuad(reduced, reduced, reduced, reduced); // quadratic term for stiffness matrix
+  TENSOR3 quadl(reduced, reduced, reduced); // linear term for the stiffness matrix
+  _constCoef.resize(reduced, reduced); // constant term for stiffness matrix equation
+
+  _linearCoef.setZero();
+  _constCoef.setZero();
 
   int n_of_triangles = _triangles.size();
 
@@ -467,16 +470,23 @@ void TRIANGLE_MESH::createCoefs()
           {
             // set values in linear coefficient of cubic polynomial
             int global_index_j = _vertexToIndex[current_jv];
-            m(global_index_i, global_index_j) += linearCoef(2*i, 2*j);
-            m(global_index_i, global_index_j + 1) += linearCoef(2*i, 2*j + 1);
-            m(global_index_i + 1, global_index_j) += linearCoef(2*i + 1, 2*j);
-            m(global_index_i + 1, global_index_j + 1) += linearCoef(2*i + 1, 2*j + 1);
 
-            // set values of constant coefficient in quadratic polynomial
-            constTemp(global_index_i, global_index_j) += constCoef(2*i, 2*j);
-            constTemp(global_index_i, global_index_j + 1) += constCoef(2*i, 2*j + 1);
-            constTemp(global_index_i + 1, global_index_j) += constCoef(2*i + 1, 2*j);
-            constTemp(global_index_i + 1, global_index_j + 1) += constCoef(2*i + 1, 2*j + 1);
+            for(int reduced_i = 0; reduced_i < reduced; reduced_i++)
+            {
+              for(int reduced_j = 0; reduced_j < reduced; reduced_j++)
+              {
+                _linearCoef(reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*linearCoef(2*i, 2*j);
+                _linearCoef(reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*linearCoef(2*i, 2*j + 1);
+                _linearCoef(reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*linearCoef(2*i + 1, 2*j);
+                _linearCoef(reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*linearCoef(2*i + 1, 2*j + 1);
+
+                // set values of constant coefficient in quadratic polynomial
+                _constCoef(reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*constCoef(2*i, 2*j);
+                _constCoef(reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*constCoef(2*i, 2*j + 1);
+                _constCoef(reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*constCoef(2*i + 1, 2*j);
+                _constCoef(reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*constCoef(2*i + 1, 2*j + 1);
+              }
+            }
 
             for(int k = 0; k < 3; k++)
             {
@@ -485,31 +495,40 @@ void TRIANGLE_MESH::createCoefs()
               {
                 int global_index_k = _vertexToIndex[current_kv];
 
-                // set values in quadratic coefficient in cubic polynomial
-                cubq._tensor[global_index_k](global_index_i, global_index_j) += cubquad._tensor[2*k](2*i, 2*j);
-                cubq._tensor[global_index_k](global_index_i, global_index_j + 1) += cubquad._tensor[2*k](2*i, 2*j + 1);
+                for(int reduced_i = 0; reduced_i < reduced; reduced_i++)
+                {
+                  for(int reduced_j = 0; reduced_j < reduced; reduced_j++)
+                  {
+                    for(int reduced_k = 0; reduced_k < reduced; reduced_k++)
+                    {
+                      // set values in quadratic coefficient in cubic polynomial
+                      cubq._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*cubquad._tensor[2*k](2*i, 2*j);
+                      cubq._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*cubquad._tensor[2*k](2*i, 2*j + 1);
 
-                cubq._tensor[global_index_k](global_index_i + 1, global_index_j) += cubquad._tensor[2*k](2*i + 1, 2*j);
-                cubq._tensor[global_index_k](global_index_i + 1, global_index_j + 1) += cubquad._tensor[2*k](2*i + 1, 2*j + 1);
+                      cubq._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*cubquad._tensor[2*k](2*i + 1, 2*j);
+                      cubq._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*cubquad._tensor[2*k](2*i + 1, 2*j + 1);
 
-                cubq._tensor[global_index_k + 1](global_index_i, global_index_j) += cubquad._tensor[2*k + 1](2*i, 2*j);
-                cubq._tensor[global_index_k + 1](global_index_i, global_index_j + 1) += cubquad._tensor[2*k + 1](2*i, 2*j + 1);
+                      cubq._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*cubquad._tensor[2*k + 1](2*i, 2*j);
+                      cubq._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*cubquad._tensor[2*k + 1](2*i, 2*j + 1);
 
-                cubq._tensor[global_index_k + 1](global_index_i + 1, global_index_j) += cubquad._tensor[2*k + 1](2*i + 1, 2*j);
-                cubq._tensor[global_index_k + 1](global_index_i + 1, global_index_j + 1) += cubquad._tensor[2*k + 1](2*i + 1, 2*j + 1);
+                      cubq._tensor[reduced_k](reduced_i, reduced_j)+= _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*cubquad._tensor[2*k + 1](2*i + 1, 2*j);
+                      cubq._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*cubquad._tensor[2*k + 1](2*i + 1, 2*j + 1);
 
-                // set values in linear coefficient in quadratic polynomial
-                quadl._tensor[global_index_k](global_index_i, global_index_j) += quadlin._tensor[2*k](2*i, 2*j);
-                quadl._tensor[global_index_k](global_index_i, global_index_j + 1) += quadlin._tensor[2*k](2*i, 2*j + 1);
+                      // set values in linear coefficient in quadratic polynomial
+                      quadl._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*quadlin._tensor[2*k](2*i, 2*j);
+                      quadl._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*quadlin._tensor[2*k](2*i, 2*j + 1);
 
-                quadl._tensor[global_index_k](global_index_i + 1, global_index_j) += quadlin._tensor[2*k](2*i + 1, 2*j);
-                quadl._tensor[global_index_k](global_index_i + 1, global_index_j + 1) += quadlin._tensor[2*k](2*i + 1, 2*j + 1);
+                      quadl._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*quadlin._tensor[2*k](2*i + 1, 2*j);
+                      quadl._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*quadlin._tensor[2*k](2*i + 1, 2*j + 1);
 
-                quadl._tensor[global_index_k + 1](global_index_i, global_index_j) += quadlin._tensor[2*k + 1](2*i, 2*j);
-                quadl._tensor[global_index_k + 1](global_index_i, global_index_j + 1) += quadlin._tensor[2*k + 1](2*i, 2*j + 1);
+                      quadl._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*quadlin._tensor[2*k + 1](2*i, 2*j);
+                      quadl._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*quadlin._tensor[2*k + 1](2*i, 2*j + 1);
 
-                quadl._tensor[global_index_k + 1](global_index_i + 1, global_index_j) += quadlin._tensor[2*k + 1](2*i + 1, 2*j);
-                quadl._tensor[global_index_k + 1](global_index_i + 1, global_index_j + 1) += quadlin._tensor[2*k + 1](2*i + 1, 2*j + 1);
+                      quadl._tensor[reduced_k](reduced_i, reduced_j)+= _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*quadlin._tensor[2*k + 1](2*i + 1, 2*j);
+                      quadl._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*quadlin._tensor[2*k + 1](2*i + 1, 2*j + 1);
+                    }
+                  }
+                }
 
                 for(int l = 0; l < 3; l++)
                 {
@@ -518,54 +537,64 @@ void TRIANGLE_MESH::createCoefs()
                   if(_vertexToIndex.find(current_lv) != _vertexToIndex.end())
                   {
                     int global_index_l = _vertexToIndex[current_lv];
+                    for(int reduced_i = 0; reduced_i < reduced; reduced_i++)
+                    {
+                      for(int reduced_j = 0; reduced_j < reduced; reduced_j++)
+                      {
+                        for(int reduced_k = 0; reduced_k < reduced; reduced_k++)
+                        {
+                          for(int reduced_l = 0; reduced_l < reduced; reduced_l++)
+                          {
+                            // set coefficients in cubic term of cubic polynomial
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l, reduced_l)*cubicCoef._tensor[2*l]._tensor[2*k](2*i, 2*j);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l + 1, reduced_l)*cubicCoef._tensor[2*l + 1]._tensor[2*k](2*i, 2*j);
 
-                    // set coefficients in cubic term of cubic polynomial
-                    temp._tensor[global_index_l]._tensor[global_index_k](global_index_i, global_index_j) += cubicCoef._tensor[2*l]._tensor[2*k](2*i, 2*j);
-                    temp._tensor[global_index_l + 1]._tensor[global_index_k](global_index_i, global_index_j) += cubicCoef._tensor[2*l + 1]._tensor[2*k](2*i, 2*j);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l, reduced_l)*cubicCoef._tensor[2*l]._tensor[2*k + 1](2*i, 2*j);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l + 1, reduced_l)*cubicCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i, 2*j);
 
-                    temp._tensor[global_index_l]._tensor[global_index_k + 1](global_index_i, global_index_j) += cubicCoef._tensor[2*l]._tensor[2*k + 1](2*i, 2*j);
-                    temp._tensor[global_index_l + 1]._tensor[global_index_k + 1](global_index_i, global_index_j) += cubicCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i, 2*j);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l, reduced_l)*cubicCoef._tensor[2*l]._tensor[2*k](2*i, 2*j + 1);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l + 1, reduced_l)*cubicCoef._tensor[2*l + 1]._tensor[2*k](2*i, 2*j + 1);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l, reduced_l)*cubicCoef._tensor[2*l]._tensor[2*k + 1](2*i, 2*j + 1);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l + 1, reduced_l)*cubicCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i, 2*j + 1);
 
-                    temp._tensor[global_index_l]._tensor[global_index_k](global_index_i, global_index_j + 1) += cubicCoef._tensor[2*l]._tensor[2*k](2*i, 2*j + 1);
-                    temp._tensor[global_index_l + 1]._tensor[global_index_k](global_index_i, global_index_j + 1) += cubicCoef._tensor[2*l + 1]._tensor[2*k](2*i, 2*j + 1);
-                    temp._tensor[global_index_l]._tensor[global_index_k + 1](global_index_i, global_index_j + 1) += cubicCoef._tensor[2*l]._tensor[2*k + 1](2*i, 2*j + 1);
-                    temp._tensor[global_index_l + 1]._tensor[global_index_k + 1](global_index_i, global_index_j + 1) += cubicCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i, 2*j + 1);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l, reduced_l)*cubicCoef._tensor[2*l]._tensor[2*k](2*i + 1, 2*j);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l + 1, reduced_l)*cubicCoef._tensor[2*l + 1]._tensor[2*k](2*i + 1, 2*j);
 
-                    temp._tensor[global_index_l]._tensor[global_index_k](global_index_i + 1, global_index_j) += cubicCoef._tensor[2*l]._tensor[2*k](2*i + 1, 2*j);
-                    temp._tensor[global_index_l + 1]._tensor[global_index_k](global_index_i + 1, global_index_j) += cubicCoef._tensor[2*l + 1]._tensor[2*k](2*i + 1, 2*j);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l, reduced_l)*cubicCoef._tensor[2*l]._tensor[2*k + 1](2*i + 1, 2*j);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l + 1, reduced_l)*cubicCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i + 1, 2*j);
 
-                    temp._tensor[global_index_l]._tensor[global_index_k + 1](global_index_i + 1, global_index_j) += cubicCoef._tensor[2*l]._tensor[2*k + 1](2*i + 1, 2*j);
-                    temp._tensor[global_index_l + 1]._tensor[global_index_k + 1](global_index_i + 1, global_index_j) += cubicCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i + 1, 2*j);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l, reduced_l)*cubicCoef._tensor[2*l]._tensor[2*k](2*i + 1, 2*j + 1);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l + 1, reduced_l)*cubicCoef._tensor[2*l + 1]._tensor[2*k](2*i + 1, 2*j + 1);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l, reduced_l)*cubicCoef._tensor[2*l]._tensor[2*k + 1](2*i + 1, 2*j + 1);
+                            temp._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l + 1, reduced_l)*cubicCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i + 1, 2*j + 1);
 
-                    temp._tensor[global_index_l]._tensor[global_index_k](global_index_i + 1, global_index_j + 1) += cubicCoef._tensor[2*l]._tensor[2*k](2*i + 1, 2*j + 1);
-                    temp._tensor[global_index_l + 1]._tensor[global_index_k](global_index_i + 1, global_index_j + 1) += cubicCoef._tensor[2*l + 1]._tensor[2*k](2*i + 1, 2*j + 1);
-                    temp._tensor[global_index_l]._tensor[global_index_k + 1](global_index_i + 1, global_index_j + 1) += cubicCoef._tensor[2*l]._tensor[2*k + 1](2*i + 1, 2*j + 1);
-                    temp._tensor[global_index_l + 1]._tensor[global_index_k + 1](global_index_i + 1, global_index_j + 1) += cubicCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i + 1, 2*j + 1);
+                            // set coefficients in quadratic term of quadratic polynomial
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l, reduced_l)*quadCoef._tensor[2*l]._tensor[2*k](2*i, 2*j);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l + 1, reduced_l)*quadCoef._tensor[2*l + 1]._tensor[2*k](2*i, 2*j);
 
-                    // set coefficients in quadratic term of quadratic polynomial
-                    tempQuad._tensor[global_index_l]._tensor[global_index_k](global_index_i, global_index_j) += quadCoef._tensor[2*l]._tensor[2*k](2*i, 2*j);
-                    tempQuad._tensor[global_index_l + 1]._tensor[global_index_k](global_index_i, global_index_j) += quadCoef._tensor[2*l + 1]._tensor[2*k](2*i, 2*j);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l, reduced_l)*quadCoef._tensor[2*l]._tensor[2*k + 1](2*i, 2*j);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l + 1, reduced_l)*quadCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i, 2*j);
 
-                    tempQuad._tensor[global_index_l]._tensor[global_index_k + 1](global_index_i, global_index_j) += quadCoef._tensor[2*l]._tensor[2*k + 1](2*i, 2*j);
-                    tempQuad._tensor[global_index_l + 1]._tensor[global_index_k + 1](global_index_i, global_index_j) += quadCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i, 2*j);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l, reduced_l)*quadCoef._tensor[2*l]._tensor[2*k](2*i, 2*j + 1);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l + 1, reduced_l)*quadCoef._tensor[2*l + 1]._tensor[2*k](2*i, 2*j + 1);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l, reduced_l)*quadCoef._tensor[2*l]._tensor[2*k + 1](2*i, 2*j + 1);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l + 1, reduced_l)*quadCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i, 2*j + 1);
 
-                    tempQuad._tensor[global_index_l]._tensor[global_index_k](global_index_i, global_index_j + 1) += quadCoef._tensor[2*l]._tensor[2*k](2*i, 2*j + 1);
-                    tempQuad._tensor[global_index_l + 1]._tensor[global_index_k](global_index_i, global_index_j + 1) += quadCoef._tensor[2*l + 1]._tensor[2*k](2*i, 2*j + 1);
-                    tempQuad._tensor[global_index_l]._tensor[global_index_k + 1](global_index_i, global_index_j + 1) += quadCoef._tensor[2*l]._tensor[2*k + 1](2*i, 2*j + 1);
-                    tempQuad._tensor[global_index_l + 1]._tensor[global_index_k + 1](global_index_i, global_index_j + 1) += quadCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i, 2*j + 1);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l, reduced_l)*quadCoef._tensor[2*l]._tensor[2*k](2*i + 1, 2*j);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l + 1, reduced_l)*quadCoef._tensor[2*l + 1]._tensor[2*k](2*i + 1, 2*j);
 
-                    tempQuad._tensor[global_index_l]._tensor[global_index_k](global_index_i + 1, global_index_j) += quadCoef._tensor[2*l]._tensor[2*k](2*i + 1, 2*j);
-                    tempQuad._tensor[global_index_l + 1]._tensor[global_index_k](global_index_i + 1, global_index_j) += quadCoef._tensor[2*l + 1]._tensor[2*k](2*i + 1, 2*j);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l, reduced_l)*quadCoef._tensor[2*l]._tensor[2*k + 1](2*i + 1, 2*j);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l + 1, reduced_l)*quadCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i + 1, 2*j);
 
-                    tempQuad._tensor[global_index_l]._tensor[global_index_k + 1](global_index_i + 1, global_index_j) += quadCoef._tensor[2*l]._tensor[2*k + 1](2*i + 1, 2*j);
-                    tempQuad._tensor[global_index_l + 1]._tensor[global_index_k + 1](global_index_i + 1, global_index_j) += quadCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i + 1, 2*j);
-
-                    tempQuad._tensor[global_index_l]._tensor[global_index_k](global_index_i + 1, global_index_j + 1) += quadCoef._tensor[2*l]._tensor[2*k](2*i + 1, 2*j + 1);
-                    tempQuad._tensor[global_index_l + 1]._tensor[global_index_k](global_index_i + 1, global_index_j + 1) += quadCoef._tensor[2*l + 1]._tensor[2*k](2*i + 1, 2*j + 1);
-                    tempQuad._tensor[global_index_l]._tensor[global_index_k + 1](global_index_i + 1, global_index_j + 1) += quadCoef._tensor[2*l]._tensor[2*k + 1](2*i + 1, 2*j + 1);
-                    tempQuad._tensor[global_index_l + 1]._tensor[global_index_k + 1](global_index_i + 1, global_index_j + 1) += quadCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i + 1, 2*j + 1);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l, reduced_l)*quadCoef._tensor[2*l]._tensor[2*k](2*i + 1, 2*j + 1);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k, reduced_k)*_U(global_index_l + 1, reduced_l)*quadCoef._tensor[2*l + 1]._tensor[2*k](2*i + 1, 2*j + 1);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l, reduced_l)*quadCoef._tensor[2*l]._tensor[2*k + 1](2*i + 1, 2*j + 1);
+                            tempQuad._tensor[reduced_l]._tensor[reduced_k](reduced_i, reduced_j) += _U(global_index_i + 1,reduced_i)*_U(global_index_j + 1, reduced_j)*_U(global_index_k + 1, reduced_k)*_U(global_index_l + 1, reduced_l)*quadCoef._tensor[2*l + 1]._tensor[2*k + 1](2*i + 1, 2*j + 1);
+                          }
+                        }
+                      }
+                    }
                   }
-
                 }
               }
             }
@@ -581,51 +610,18 @@ void TRIANGLE_MESH::createCoefs()
     cubicCoef.clear();
     cubquad.clear();
   }
-
-  // reduction matrix
-  MATRIX transpose = _U.transpose();
-
   // set reduced coefficients for the cubic polynomial
-
-  // linear term
-  _linearCoef = transpose*(m*_U);
-  m.resize(0,0);
-
-
   // cubic coefficient
-  _cubicCoef = temp.modeFourProduct(transpose);
-  temp.clear();
-  _cubicCoef = _cubicCoef.modeThreeProduct(transpose);
-  _cubicCoef = _cubicCoef.modeTwoProduct(transpose);
-  _cubicCoef = _cubicCoef.modeOneProduct(transpose);
-
+  _cubicCoef = temp;
   // quadratic coefficient of cubic polynomial
-  _cubicquad = cubq.modeThreeProduct(transpose);
-  cubq.clear();
-  _cubicquad = _cubicquad.modeTwoProduct(transpose);
-  _cubicquad = _cubicquad.modeOneProduct(transpose);
+  _cubicquad = cubq;
 
   // set reduced coefficients for quadratic polynomial
-
-  // constant term
-  _constCoef = transpose*(constTemp*_U);
-  constTemp.resize(0,0);
-
   // linear term
-  _quadlinear = quadl.modeThreeProduct(transpose);
-  quadl.clear();
-  _quadlinear = _quadlinear.modeTwoProduct(transpose);
-  _quadlinear = _quadlinear.modeOneProduct(transpose);
-
+  _quadlinear = quadl;
   // quadratic term
-  _quadraticCoef = tempQuad.modeFourProduct(transpose);
-  tempQuad.clear();
-  _quadraticCoef = _quadraticCoef.modeThreeProduct(transpose);
-  _quadraticCoef = _quadraticCoef.modeTwoProduct(transpose);
-  _quadraticCoef = _quadraticCoef.modeOneProduct(transpose);
+  _quadraticCoef = tempQuad;
 
-  // free memory if reduced
-  transpose.resize(0,0);
 }
 
 ///////////////////////////////////////////////////////////////////////
