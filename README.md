@@ -6,7 +6,9 @@ To compile the code, run make within 2d/projects/simulation_code. After compilin
 
 There are some pre-made commands you can run. For example, executing
 
+```{r}
 ./makeBunSim
+```
 
 will take the bunny.svg file from the data folder, create a triangle mesh, execute quasistatics on the mesh 60 times in order to create a reduction basis, then run a reduced motion simulation on this code. Within the 2D directory, there are three executables like this: ./makeBunSim, ./makeCircleSim, and ./makeCragSim.
 
@@ -34,7 +36,7 @@ To run an unreduced quasistatics simulation, run the command
 
 ./bin/sim ./data/[yourImageName].1 [SQUASH/STRETCH/LSHEAR/RSHEAR] [-m]
 
-To run a reduced quasistatics simulation, run the command 
+To run a reduced quasistatics simulation, run the command
 
 ...
 
