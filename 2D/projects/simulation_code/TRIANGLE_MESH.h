@@ -21,8 +21,9 @@ public:
   // build the deformable model
   void buildBlob(int sceneNum, const char* filename, bool create_basis, int cols);
 
-  // take a step
-  bool stepQuasistatic();
+  // take a step. The function takes in a boolean to state whether or not we are running
+  // a reduced simulation 
+  bool stepQuasistatic(bool reduced);
 
 //----------------------------------------------------------
   // Euler's equation of motion

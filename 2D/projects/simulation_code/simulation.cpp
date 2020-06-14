@@ -342,7 +342,7 @@ void glutIdle()
     }
     else
     {
-      triangleMesh.stepQuasistatic();
+      triangleMesh.stepQuasistatic(false);
     }
     frame++;
 
@@ -496,7 +496,7 @@ void readCommandLine(int argc, char** argv)
             basisBuild.stretch2(-0.002);
             break;
         }
-        basisBuild.stepQuasistatic();
+        basisBuild.stepQuasistatic(false);
         VECTOR displacements = basisBuild.getDisplacement();
         int u_size = displacements.size();
         if( i == 0 && j == 0 ) fprintf(file, "%i %i\n", u_size, 60);

@@ -893,7 +893,7 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
 ///////////////////////////////////////////////////////////////////////
 // a quasistatic step
 ///////////////////////////////////////////////////////////////////////
-bool TRIANGLE_MESH::stepQuasistatic()
+bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 {
   //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
   MATRIX K(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
