@@ -19,21 +19,18 @@ public:
   void addWall(const WALL& wall)             { _walls.push_back(wall); };
 
   // build the deformable model
-  void buildBlob(int sceneNum, const char* filename, bool create_basis, int cols);
+  void buildBlob(int sceneNum, const char* filename, bool reduced, int cols);
 
   // take a step. The function takes in a boolean to state whether or not we are running
-  // a reduced simulation 
+  // a reduced simulation
   bool stepQuasistatic(bool reduced);
 
 //----------------------------------------------------------
   // Euler's equation of motion
-  void stepMotion(float dt, const VEC2& outerForce, int sceneNum);
+  void stepMotion(float dt, const VEC2& outerForce);
 
   // regular equation of motion
   void setMassMatrix(bool reduction);
-
-  // set U with translation
-  void setBasisReduction();
 
   // set U without translation by reading in a file and num of cols
   void basisNoTranslation(const char* filename, int basis_cols);
@@ -43,12 +40,6 @@ public:
 
   // add a force to a single vertex
   void addSingleForce(const VEC2& bodyForce, int vertex);
-
-  // your average joe collision detection
-  void checkCollision();
-
-  // a weird but fun collision detector
-  void wackyCollision();
 
   // precompute coefficients
   void createCoefs();

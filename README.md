@@ -33,27 +33,19 @@ After a poly file is created, the specifications for a triangle mesh can be made
 #### Step 3
 After the .poly, .node, and .ele files are created, the simulation can be run. There are two different kinds of simulations that can be run: a quasistatics simulation or a motion simulation. In addition, both of these simulations can be reduced or unreduced.
 
-To run an unreduced motion sim, run the command
+To run an unreduced sim, run the command
 
 ```{r}
-./bin/sim ./data/[yourImageName].1 MOTION -b [-m]
+./bin/sim ./data/[yourImageName].1 [SQUASH/STRETCH/LSHEAR/RSHEAR/MOTION] [-m]
 ```
 
-To run the reduced motion sim, run the command
+To run a reduced sim, run the command
 
 ```{r}
-./bin/sim ./data/[yourImageName].1 MOTION -b -q [int of your choice] [-m]
+./bin/sim ./data/[yourImageName].1 [SQUASH/STRETCH/LSHEAR/RSHEAR/MOTION] -q [int of your choice] [-m]
 ```
 
-To run an unreduced quasistatics simulation, run the command
-
-```{r}
-./bin/sim ./data/[yourImageName].1 [SQUASH/STRETCH/LSHEAR/RSHEAR] [-m]
-```
-
-To run a reduced quasistatics simulation, run the command
-
-...
+To create a basis, add the flag -n to any command 
 
 ## Concepts Behind the Code
 (describe StVK and Stable Neo-Hookean approaches, describe tensor algebraic approach)

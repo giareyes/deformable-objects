@@ -36,7 +36,7 @@ TRIANGLE_MESH::~TRIANGLE_MESH()
   delete _material;
 }
 
-void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_basis, int cols)
+void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool reduced, int cols)
 {
   _vertices.clear();
   _triangles.clear();
@@ -199,25 +199,15 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
   // allocate the state vectors
   _DOFs = 2 * (_vertices.size() - _constrainedVertices.size());
 
-  // if this is not a motion sim with translation
-  if (sceneNum)
-  {
-    size = _unconstrainedVertices.size()*2;
-    if(!create_basis)
-      basisNoTranslation(filename, cols);
-  }
-  else
-  {
-    // this function doesn't actually work - currently motion won't be reduced
-    setBasisReduction();
-    size = _vertices.size()*2;
-  }
+  // if this sim is reduced, read in basis and create the matrix
+  if(reduced)
+    basisNoTranslation(filename, cols);
 
   // create the mass matrix
-  setMassMatrix(!create_basis);
+  setMassMatrix(reduced);
 
   // set all vectors to zero and determine their size
-  VECTOR zeros(size);
+  VECTOR zeros(_unconstrainedVertices.size()*2);
   VECTOR z2(_U.cols());
 
   z2.setZero();
@@ -236,7 +226,7 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
   computeVertexToIndexTable();
 
   // if we aren't creating a basis, then create the tensor coefficients for precomputed method
-  if(!create_basis)
+  if(reduced)
     createCoefs();
 }
 
@@ -315,6 +305,7 @@ void TRIANGLE_MESH::setMassMatrix(bool reduction)
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::basisNoTranslation(const char* filename, int basis_cols)
 {
+  printf("reduction!!!\n");
   FILE* file = NULL;
   int rows;
   int cols;
@@ -337,16 +328,6 @@ void TRIANGLE_MESH::basisNoTranslation(const char* filename, int basis_cols)
    _U = svddiag;
 
   // printMatrix(_U);
-}
-
-///////////////////////////////////////////////////////////////////////
-// Create a basis matrix with translation.
-// NOTE: THIS CURRENTLY DOES NOTHING. IGNORE FOR NOW, REWRITE LATER.
-///////////////////////////////////////////////////////////////////////
-void TRIANGLE_MESH::setBasisReduction()
-{
-  MATRIX U(46,9);
-  _U = U;
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -711,101 +692,9 @@ void TRIANGLE_MESH::computeUnprecomputedMaterialForces()
 }
 
 ///////////////////////////////////////////////////////////////////////
-// A weird collision detection function
-///////////////////////////////////////////////////////////////////////
-void TRIANGLE_MESH::wackyCollision()
-{
-  float kw = 100; // spring constant of wall
-  float l = 0.1; // dampening force constant
-
-  for(unsigned int y = 0; y < _walls.size(); y++)
-  {
-    for(int x = 0; x < _vertices.size(); x++ )
-    {
-      float diffx;
-      if(_walls[y].point()[0] > 0)
-        diffx = _walls[y].point()[0] - (_vertices[x][0]);
-      else
-        diffx = _walls[y].point()[0] - (_vertices[x][0]);
-
-      float diffy =  _walls[y].point()[1] - (_vertices[x][1]);
-      int velocity_index;
-      std::vector<int>::iterator it = std::find(_constrainedVertices.begin(), _constrainedVertices.end(), x);
-      if(it != _constrainedVertices.end())
-      {
-        velocity_index = std::distance(_constrainedVertices.begin(), it);
-        velocity_index =  _unconstrainedVertices.size()*2 + velocity_index*2;
-      }
-      else
-      {
-        it = std::find(_unconstrainedVertices.begin(), _unconstrainedVertices.end(), x);
-        velocity_index = std::distance(_unconstrainedVertices.begin(), it);
-        velocity_index = velocity_index*2;
-      }
-
-      if((diffx >= 0 && _walls[y].point()[0] < 0) || (diffx <= 0 && _walls[y].point()[0] > 0) ) //did it hit a side wall?
-      {
-        VEC2 force;
-        force = ( kw * abs(diffx) * _walls[y].normal() ); //apply spring force of wall
-        force += ( l * _velocity[velocity_index] * _walls[y].normal() ); //apply dampening force
-        _fExternal[velocity_index] += force[0];
-        _fExternal[velocity_index + 1] += force[1];
-      }
-      if(diffy >= 0 && _walls[y].point()[1] != 0) // did it hit the floor?
-      {
-        VEC2 force;
-        force = (kw * diffy * _walls[y].normal() ); //apply spring force of wall
-        force += ( l * _velocity[velocity_index + 1] * _walls[y].normal() ); //apply dampening force
-        _fExternal[velocity_index] += force[0];
-        _fExternal[velocity_index + 1] += force[1];
-      }
-    }
-  }
-}
-
-///////////////////////////////////////////////////////////////////////
-// A correct collision detection function
-///////////////////////////////////////////////////////////////////////
-void TRIANGLE_MESH::checkCollision()
-{
-  float kw = 100; // spring constant of wall
-  float l = 0.1; // dampening force constant
-
-  for(unsigned int y = 0; y < _walls.size(); y++)
-  {
-    for(int x = 0; x < _vertices.size(); x++ )
-    {
-      float diffx;
-      if(_walls[y].point()[0] > 0)
-        diffx = _walls[y].point()[0] - (_vertices[x][0]);
-      else
-        diffx = _walls[y].point()[0] - (_vertices[x][0]);
-
-      float diffy =  _walls[y].point()[1] - (_vertices[x][1]);
-
-      if((diffx >= 0 && _walls[y].point()[0] < 0) || (diffx <= 0 && _walls[y].point()[0] > 0) ) //did it hit a side wall?
-      {
-        addBodyForce( kw * abs(diffx) * _walls[y].normal() ); //apply spring force of wall
-        addBodyForce( l * _velocity[2*x] * _walls[y].normal() ); //apply dampening force
-        addSingleForce(abs(diffx) * _walls[y].normal(), x);
-        break;
-      }
-      if(diffy >= 0 && _walls[y].point()[1] != 0) // did it hit the floor?
-      {
-          addBodyForce( kw * diffy * _walls[y].normal() ); //apply spring force of wall
-          addBodyForce( l * _velocity[2*x + 1] * _walls[y].normal() ); //apply dampening force
-          addSingleForce(abs(diffy) * _walls[y].normal(), x);
-          break;
-      }
-    }
-  }
-
-}
-
-///////////////////////////////////////////////////////////////////////
 // Motion step using Euler-Lagrange equation of motion
 ///////////////////////////////////////////////////////////////////////
-void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
+void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
 {
   //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
   // MATRIX K(_u.size(),_u.size() );
@@ -818,13 +707,6 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
   MATRIX inverse;
   float alpha = 0.01; // constant for damping
   float beta = 0.02;  // constant for damping
-
-  // in barbic, idk if you need to check collision with the wall.
-  if (sceneNum == 0)
-  {
-    printf("checking collision\n");
-    checkCollision();
-  }
 
   // Newton Raphson Iteration, but j-max is 1 so no need to write the loop
   //step 1: compute K
@@ -868,16 +750,7 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
   qTou();
 
   // step 8: update all node positions w new displacement vector
-  // int unconstrained = _unconstrainedVertices.size();
   uScatter();
-
-  // for(int x = 0; x < _constrainedVertices.size(); x++)
-  // {
-  //   VEC2 displacement;
-  //   displacement[0] = _u[2*unconstrained + 2*x];
-  //   displacement[1] = _u[2*unconstrained + 2*x + 1];
-  //   _vertices[_constrainedVertices[x]] = _restVertices[_constrainedVertices[x]]+ displacement;
-  // }
 
   // step 9: calculate velocity and accleration
   VECTOR newVel = a4*dq + a5*_rv + a6*_ra;
@@ -895,34 +768,50 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
 ///////////////////////////////////////////////////////////////////////
 bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 {
-  //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
-  MATRIX K(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
-  // MATRIX K(_u.size(),_u.size());
-  // MATRIX K(_q.size(),_q.size());
+  MATRIX K;
 
-  //step 1: compute K
-  K.setZero();
-  computeUnprecomputedStiffnessMatrix(K);
+  //make stiffness Matrix K
+  if(reduced)
+  {
+    K.resize(_q.size(), _q.size());
+    K.setZero();
 
-  //step 2: compute internal material forces, R(uq)
-  computeUnprecomputedMaterialForces();
+    // compute K and R
+    computeStiffnessMatrix(K);
+    computeMaterialForces();
 
-  // //step 3: external forces transform
-  // VECTOR reducedF = _U.transpose() * _fExternal;
+    printf("reduced stiffness matrix:\n");
+    printMatrix(K);
 
-  // step 4: form the residual (r = F + E)
-  VECTOR r2 = -1*(_f + _fExternal);
-  // VECTOR r2 = -1*(_f + reducedF);
+    printf("\n reduced material forces:\n");
+    printVector(_f);
 
-  //step 5: compute x = K .inverse().eval()  * r
-  // MATRIX inverse2 = K.inverse().eval();
-  // VECTOR x2 = inverse2*r2;
-  VECTOR x2 = K.colPivHouseholderQr().solve(r2);
+    printf("\n\n-------------------------------------------------\n\n");
 
-  //step 6: add solution x to displamcement vector _u
-  _u += x2;
-  // _q += x2;
-  // qTou();
+    VECTOR reducedF = _U.transpose() * _fExternal;
+    VECTOR r2 = -1*(_f + reducedF);
+
+    // solve for change in displacement
+    VECTOR x2 = K.colPivHouseholderQr().solve(r2);
+
+    _q += x2;
+    qTou();
+  }
+  else
+  {
+    K.resize(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
+    K.setZero();
+
+    // compute K and R
+    computeUnprecomputedStiffnessMatrix(K);
+    computeUnprecomputedMaterialForces();
+
+    VECTOR r2 = -1*(_f + _fExternal);
+
+    // solve for change in displacement
+    VECTOR x2 = K.colPivHouseholderQr().solve(r2);
+    _u += x2;
+  }
 
   //step 7: update all node positions w new displacement vector
   uScatter();

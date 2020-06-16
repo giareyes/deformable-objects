@@ -39,6 +39,7 @@ int mouseModifiers = -1;
 bool animate = false;
 bool singleStep = false;
 bool createBasis = false;
+bool reduced = false;
 // float dt = 1.0/15360.0;
 float dt = 1.0/100.0;
 
@@ -63,7 +64,7 @@ VEC2 bodyForce;
 
 enum SCENE { STRETCH, SQUASH, LSHEAR, RSHEAR, SINGLE, MOTION};
 SCENE scene = SINGLE;
-int sceneNum = 1;
+int sceneNum = 0;
 
 int meshFlag = 0;
 
@@ -251,7 +252,8 @@ void glutMouseMotion(int x, int y)
     double mouseX = ((double) xMouse / 400.0) - 1;
     double mouseY = ((double) (800 - yMouse) / 400.0) - 1;
 
-    if (sceneNum == 1)
+    // if this is a motion sim, it should be interactive
+    if (sceneNum)
     {
       for (int i = 0; i < unconstrainedVertices.size(); i++)
       {
@@ -265,22 +267,6 @@ void glutMouseMotion(int x, int y)
           printf("screenx %f\n", screenX);
           printf("screeny %f\n\n\n", screenY);
           triangleMesh.addSingleForce(VEC2(xDiff, -1*yDiff), unconstrainedVertices[i]);
-        }
-      }
-    }
-    else
-    {
-      printf("else\n");
-      for (int i = 0; i < vertices.size(); i++)
-      {
-        if (screenX <= vertices[i][0] + 0.04
-          && screenX >= vertices[i][0] - 0.04
-          && screenY <= vertices[i][1] + 0.03
-          && screenY >= vertices[i][1] - 0.03)
-        {
-          printf("addforce\n");
-          triangleMesh.addBodyForce(VEC2(xDiff*2, -1*yDiff*2));
-          triangleMesh.addSingleForce(VEC2(xDiff, -1*yDiff), i);
         }
       }
     }
@@ -327,22 +313,14 @@ void glutIdle()
 
     if (scene == MOTION)
     {
-      if (frame == 0 && sceneNum == 0) // if we are on the first frame, insert a force so they jump
-      {
-        triangleMesh.addBodyForce(VEC2(10.0, 200.0));
-      }
       for( int i = 0; i < 15; i ++)
       {
-        if (sceneNum == 0)
-        {
-          triangleMesh.addBodyForce(bodyForce);
-        }
-        triangleMesh.stepMotion(dt, bodyForce, sceneNum);
+        triangleMesh.stepMotion(dt, bodyForce);
       }
     }
     else
     {
-      triangleMesh.stepQuasistatic(false);
+      triangleMesh.stepQuasistatic(reduced);
     }
     frame++;
 
@@ -433,7 +411,7 @@ void readCommandLine(int argc, char** argv)
     else
     {
       scene = MOTION;
-      sceneNum = 0;
+      sceneNum = 1;
     }
 
     if (argc > 3)
@@ -442,11 +420,11 @@ void readCommandLine(int argc, char** argv)
       {
         if (argv[x][1] == 'm')
           meshFlag = 1;
-        else if (argv[x][1] == 'b')
-          sceneNum = 1;
+        else if (argv[x][1] == 'n')
+          createBasis = true;
         else if (argv[x][1] == 'q')
         {
-          createBasis = true;
+          reduced = true;
           if( x + 1 == argc )
           {
             cout << " invalid number of arguments. Need an int after the -q flag" << endl;
@@ -461,7 +439,7 @@ void readCommandLine(int argc, char** argv)
   else
   {
     scene = MOTION;
-    sceneNum = 0;
+    sceneNum = 1;
   }
 
   // if we are creating a basis, we must create a file with all of the deformations we will be using
@@ -477,7 +455,7 @@ void readCommandLine(int argc, char** argv)
     for(int i = 0; i < 4; i++)
     {
       TRIANGLE_MESH basisBuild(poissonsRatio, youngsModulus);
-      basisBuild.buildBlob(1, argv[1], true, 0);
+      basisBuild.buildBlob(1, argv[1], false, 0);
       bodyForce[0] = 0;
       bodyForce[1] = -0.3;
       for(int j = 0; j < 15; j++)
@@ -509,12 +487,12 @@ void readCommandLine(int argc, char** argv)
     }
     fclose(file);
     // build the scene
-    triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
+    triangleMesh.buildBlob(sceneNum, argv[1], reduced, basisCols);
   }
   else
   {
     // build the scene
-    triangleMesh.buildBlob(sceneNum, argv[1], true, 0);
+    triangleMesh.buildBlob(sceneNum, argv[1], reduced, basisCols);
   }
 
   bodyForce[0] = 0;
@@ -532,7 +510,8 @@ int main(int argc, char** argv)
 {
   cout << " Usage: " << argv[0] << "<vertex filename> <which scene> <extra args>" << endl;
   cout << "\t Valid values: " << endl;
-  cout << "\t\t <which test>: SINGLE, LSHEAR, RSHEAR, SQUASH, STRETCH, MOTION" << endl;
+  cout << "\t\t <which scene>: SINGLE, LSHEAR, RSHEAR, SQUASH, STRETCH, MOTION" << endl;
+  cout << "\t\t <extra args>: -m -q [followed by int] -n" << endl;
 
   readCommandLine(argc, argv);
 
