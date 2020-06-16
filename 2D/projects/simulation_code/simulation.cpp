@@ -455,7 +455,7 @@ void readCommandLine(int argc, char** argv)
     for(int i = 0; i < 4; i++)
     {
       TRIANGLE_MESH basisBuild(poissonsRatio, youngsModulus);
-      basisBuild.buildBlob(1, argv[1], false, 0);
+      basisBuild.buildBlob(argv[1], false, 0);
       bodyForce[0] = 0;
       bodyForce[1] = -0.3;
       for(int j = 0; j < 15; j++)
@@ -487,12 +487,12 @@ void readCommandLine(int argc, char** argv)
     }
     fclose(file);
     // build the scene
-    triangleMesh.buildBlob(sceneNum, argv[1], reduced, basisCols);
+    triangleMesh.buildBlob(argv[1], reduced, basisCols);
   }
   else
   {
     // build the scene
-    triangleMesh.buildBlob(sceneNum, argv[1], reduced, basisCols);
+    triangleMesh.buildBlob(argv[1], reduced, basisCols);
   }
 
   bodyForce[0] = 0;
@@ -511,7 +511,7 @@ int main(int argc, char** argv)
   cout << " Usage: " << argv[0] << "<vertex filename> <which scene> <extra args>" << endl;
   cout << "\t Valid values: " << endl;
   cout << "\t\t <which scene>: SINGLE, LSHEAR, RSHEAR, SQUASH, STRETCH, MOTION" << endl;
-  cout << "\t\t <extra args>: -m -q [followed by int] -n" << endl;
+  cout << "\t\t <extra args>: -m, -q [followed by int], -n" << endl;
 
   readCommandLine(argc, argv);
 

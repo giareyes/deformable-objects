@@ -36,7 +36,7 @@ TRIANGLE_MESH::~TRIANGLE_MESH()
   delete _material;
 }
 
-void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool reduced, int cols)
+void TRIANGLE_MESH::buildBlob(const char* filename, bool reduced, int cols)
 {
   _vertices.clear();
   _triangles.clear();
@@ -201,14 +201,21 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool reduced, 
 
   // if this sim is reduced, read in basis and create the matrix
   if(reduced)
+  {
     basisNoTranslation(filename, cols);
+    size = _U.cols();
+  }
+  else
+  {
+    size = _unconstrainedVertices.size()*2;
+  }
 
   // create the mass matrix
   setMassMatrix(reduced);
 
   // set all vectors to zero and determine their size
   VECTOR zeros(_unconstrainedVertices.size()*2);
-  VECTOR z2(_U.cols());
+  VECTOR z2(size);
 
   z2.setZero();
   zeros.setZero();
@@ -285,7 +292,7 @@ void TRIANGLE_MESH::setMassMatrix(bool reduction)
   // matrix of size 2Nx2N
   MATRIX M(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
 
-  //for now we will make every vertex has mass 1
+  //for now we will make every vertex have mass 15
   M.setIdentity();
   M = M*15;
 
@@ -326,8 +333,6 @@ void TRIANGLE_MESH::basisNoTranslation(const char* filename, int basis_cols)
    svddiag = svd.matrixU();
    svddiag.conservativeResize(svddiag.rows(), basis_cols);
    _U = svddiag;
-
-  // printMatrix(_U);
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -612,8 +617,8 @@ void TRIANGLE_MESH::createCoefs()
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::computeMaterialForces()
 {
-  //the global vector will be v= [f_0, f_1 ...] where each f_i = [x,y] (column vectors)
-  //and forces are only for unconstrained vertices. This means the size of this vector is
+  //the global vector will be v= [f_0, f_1 ...] where each f_i = x or y
+  //and forces are only for unconstrained vertices.
 
   VECTOR displacement = _q;
   // VECTOR displacement = _u;
@@ -651,7 +656,7 @@ void TRIANGLE_MESH::computeMaterialForces()
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::computeUnprecomputedMaterialForces()
 {
-  //the global vector will be v= [f_0, f_1 ...] where each f_i = [x,y] (column vectors)
+  //the global vector will be v= [f_0, f_1 ...] where each f_(2i) = x_i, f(2i + 1) = y_i
   //and forces are only for unconstrained vertices. This means the size of this vector is
   // size(unconstrained vertices)*2 since each has an x,y component
   VECTOR global_vector(_unconstrainedVertices.size()*2);
@@ -768,9 +773,8 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
 ///////////////////////////////////////////////////////////////////////
 bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 {
-  MATRIX K;
+  MATRIX K; //stiffness matrix
 
-  //make stiffness Matrix K
   if(reduced)
   {
     K.resize(_q.size(), _q.size());
@@ -829,8 +833,7 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::computeStiffnessMatrix(MATRIX& K)
 {
-  //can assume K is the correct size, 2V x 2V
-
+  //can assume K is the correct size, q x q
   VECTOR displacement = _q;
   // VECTOR displacement = _u;
 

@@ -19,7 +19,7 @@ public:
   void addWall(const WALL& wall)             { _walls.push_back(wall); };
 
   // build the deformable model
-  void buildBlob(int sceneNum, const char* filename, bool reduced, int cols);
+  void buildBlob(const char* filename, bool reduced, int cols);
 
   // take a step. The function takes in a boolean to state whether or not we are running
   // a reduced simulation
