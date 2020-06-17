@@ -117,8 +117,8 @@ void TRIANGLE_MESH::buildBlob(const char* filename, bool reduced, int cols)
         _vertices[i][1] += (-0.95 - mins[1]);
         _restVertices[i][1] += (-0.95 - mins[1]);
 
-        (_restVertices[i][1] < -0.85 || (_restVertices[i][1] > maxs[1] - 1.05 - mins[1]))? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
-        // (_restVertices[i][1] < -0.85)? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
+        // (_restVertices[i][1] < -0.85 || (_restVertices[i][1] > maxs[1] - 1.05 - mins[1]))? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
+        (_restVertices[i][1] < -0.85)? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
       }
     }
   }
@@ -804,6 +804,9 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 
     _q += x2;
     qTou();
+
+    // printf("\n displacement:\n");
+    // printVector(_u);
   }
   else
   {

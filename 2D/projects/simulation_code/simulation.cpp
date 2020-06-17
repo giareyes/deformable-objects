@@ -457,21 +457,29 @@ void readCommandLine(int argc, char** argv)
       TRIANGLE_MESH basisBuild(poissonsRatio, youngsModulus);
       basisBuild.buildBlob(argv[1], false, 0);
       bodyForce[0] = 0;
-      bodyForce[1] = -0.3;
+      bodyForce[1] = 0;
       for(int j = 0; j < 15; j++)
       {
         switch(i) {
           case 0:
-            basisBuild.stretch2(0.002);
+            // basisBuild.stretch2(0.002);
+            bodyForce[1] = 0.0005;
+            basisBuild.addBodyForce(bodyForce);
             break;
           case 1:
-            basisBuild.stepShearTest(0.002);
+            // basisBuild.stepShearTest(0.002);
+            bodyForce[0] = 0.0005;
+            basisBuild.addBodyForce(bodyForce);
             break;
           case 2:
-            basisBuild.stepShearTest(-0.002);
+            // basisBuild.stepShearTest(-0.002);
+            bodyForce[0] = -0.0005;
+            basisBuild.addBodyForce(bodyForce);
             break;
           case 3:
-            basisBuild.stretch2(-0.002);
+            // basisBuild.stretch2(-0.002);
+            bodyForce[1] = -0.0005;
+            basisBuild.addBodyForce(bodyForce);
             break;
         }
         basisBuild.stepQuasistatic(false);
@@ -496,7 +504,8 @@ void readCommandLine(int argc, char** argv)
   }
 
   bodyForce[0] = 0;
-  bodyForce[1] = -0.3;
+  bodyForce[1] = -0.0005;
+  // bodyForce[1] = -0.0005;
 
   triangleMesh.addWall(WALL(VEC2(1,0), VEC2(-0.98,0)));
   triangleMesh.addWall(WALL(VEC2(-1,0), VEC2(0.98,0)));
