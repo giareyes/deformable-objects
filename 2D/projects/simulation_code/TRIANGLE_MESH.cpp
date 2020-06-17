@@ -4,7 +4,10 @@
 #include <float.h>
 #include <random>
 
-#define MATMODEL 1 // determines what kind of material we are using. 0 = STVK, 1 = NEOHOOKEAN
+// determines what kind of material we are using. 0 = STVK, 1 = NEOHOOKEAN.
+// NOTE: IF YOU CHANGE THIS VALUE HERE, YOU MUST CHANGE IT IN TRIANGLE.cpp
+// AS WELL!!!
+#define MATMODEL 0
 #include "STVK.h"
 #include "NEOHOOKEAN.h"
 
@@ -115,6 +118,7 @@ void TRIANGLE_MESH::buildBlob(const char* filename, bool reduced, int cols)
         _restVertices[i][1] += (-0.95 - mins[1]);
 
         (_restVertices[i][1] < -0.85 || (_restVertices[i][1] > maxs[1] - 1.05 - mins[1]))? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
+        // (_restVertices[i][1] < -0.85)? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
       }
     }
   }
@@ -784,13 +788,13 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
     computeStiffnessMatrix(K);
     computeMaterialForces();
 
-    printf("reduced stiffness matrix:\n");
-    printMatrix(K);
-
-    printf("\n reduced material forces:\n");
-    printVector(_f);
-
-    printf("\n\n-------------------------------------------------\n\n");
+    // printf("reduced stiffness matrix:\n");
+    // printMatrix(K);
+    //
+    // printf("\n reduced material forces:\n");
+    // printVector(_f);
+    //
+    // printf("\n\n-------------------------------------------------\n\n");
 
     VECTOR reducedF = _U.transpose() * _fExternal;
     VECTOR r2 = -1*(_f + reducedF);
@@ -808,7 +812,16 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 
     // compute K and R
     computeUnprecomputedStiffnessMatrix(K);
+
+    // printf("stiffness matrix:\n");
+    // printMatrix(K);
+    // printf("\n -------------------------------- \n \n");
+
     computeUnprecomputedMaterialForces();
+
+    // printf("internal force:\n");
+    // printVector(_f);
+    // printf("\n -------------------------------- \n \n");
 
     VECTOR r2 = -1*(_f + _fExternal);
 
