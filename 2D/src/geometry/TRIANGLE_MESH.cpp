@@ -48,10 +48,10 @@ TRIANGLE_MESH::TRIANGLE_MESH(const Real poissonsRatio, const Real youngsModulus)
   //_material = new CARAP(lambda, mu);
   //_material = new COROTATIONAL(lambda, mu);
   //_material = new ARAP(lambda, mu);
-  
+
   //_material = new ARAP(lambda, mu);
   _material = new STABLE_NEO_HOOKEAN(lambda, mu);
-  
+
   _hasNan = false;
   //_springStiffness = 1000000;
   //_springStiffness = 1000;
@@ -62,7 +62,7 @@ TRIANGLE_MESH::TRIANGLE_MESH(const Real poissonsRatio, const Real youngsModulus)
   _pcgSeen = 0;
 }
 
-TRIANGLE_MESH::~TRIANGLE_MESH() 
+TRIANGLE_MESH::~TRIANGLE_MESH()
 {
   delete _material;
 }
@@ -86,20 +86,20 @@ void TRIANGLE_MESH::setMaterial(const std::string& whichMaterial, const Real& po
 
   cout << " Using Lame lambda: " << lambda << endl;
   delete _material;
- 
-  if (strcmp(whichMaterial.c_str(), "STVK") == 0) 
+
+  if (strcmp(whichMaterial.c_str(), "STVK") == 0)
     _material = new STVK(lambda, mu);
-  else if (strcmp(whichMaterial.c_str(), "NEO_HOOKEAN") == 0) 
+  else if (strcmp(whichMaterial.c_str(), "NEO_HOOKEAN") == 0)
     _material = new NEO_HOOKEAN(lambda, mu);
-  else if (strcmp(whichMaterial.c_str(), "COROTATIONAL") == 0) 
+  else if (strcmp(whichMaterial.c_str(), "COROTATIONAL") == 0)
     _material = new COROTATIONAL(lambda, mu);
-  else if (strcmp(whichMaterial.c_str(), "MOONEY_RIVLIN") == 0) 
+  else if (strcmp(whichMaterial.c_str(), "MOONEY_RIVLIN") == 0)
     _material = new MOONEY_RIVLIN(lambda, mu);
-  else if (strcmp(whichMaterial.c_str(), "ARRUDA_BOYCE") == 0) 
+  else if (strcmp(whichMaterial.c_str(), "ARRUDA_BOYCE") == 0)
     _material = new ARRUDA_BOYCE(lambda, mu);
-  else if (strcmp(whichMaterial.c_str(), "VOLUME_NH") == 0) 
+  else if (strcmp(whichMaterial.c_str(), "VOLUME_NH") == 0)
     _material = new VOLUME_NH(lambda, mu);
-  else if (strcmp(whichMaterial.c_str(), "ARAP") == 0) 
+  else if (strcmp(whichMaterial.c_str(), "ARAP") == 0)
     _material = new ARAP(lambda, mu);
   else if (strcmp(whichMaterial.c_str(), "INVERTIBLE") == 0)
     _material = new INVERTIBLE(new ARAP(lambda, mu), 0.6);
@@ -320,7 +320,7 @@ void TRIANGLE_MESH::buildFloatingTest(const int xSquares, const int ySquares)
       upper.push_back(v[1]);
       upper.push_back(v[2]);
       _triangles.push_back(TRIANGLE(_material, upper));
-      
+
       vector<VEC2*> lower;
       lower.push_back(v[2]);
       lower.push_back(v[3]);
@@ -400,7 +400,7 @@ void TRIANGLE_MESH::buildPullTest(const int xSquares, const int ySquares)
       upper.push_back(v[1]);
       upper.push_back(v[2]);
       _triangles.push_back(TRIANGLE(_material, upper));
-      
+
       vector<VEC2*> lower;
       lower.push_back(v[2]);
       lower.push_back(v[3]);
@@ -443,7 +443,7 @@ void TRIANGLE_MESH::buildDegenerateColumnPullTest(const int xSquares, const int 
   std::uniform_real_distribution<double> distribution(-1.0, 1.0);
 
   _springConstraints.clear();
-  // build the square corners 
+  // build the square corners
   for (int y = 0; y < ySquares + 1; y++)
     for (int x = 0; x < xSquares + 1; x++)
     {
@@ -513,7 +513,7 @@ void TRIANGLE_MESH::buildDegenerateColumnPullTest(const int xSquares, const int 
       _vertices.push_back(vertex);
       _restVertices.push_back(vertex);
       _unconstrainedVertices.push_back(_vertices.size() - 1);
-      
+
       if (isDegenerate)
         _ruinedVertices.push_back(_vertices.size() - 1);
     }
@@ -544,14 +544,14 @@ void TRIANGLE_MESH::buildDegenerateColumnPullTest(const int xSquares, const int 
       pointers.push_back(v[4]);
       _triangles.push_back(TRIANGLE(_material, pointers));
       pointers.clear();
-      
+
       // bottom
       pointers.push_back(v[0]);
       pointers.push_back(v[1]);
       pointers.push_back(v[4]);
       _triangles.push_back(TRIANGLE(_material, pointers));
       pointers.clear();
-      
+
       // right
       pointers.push_back(v[1]);
       pointers.push_back(v[2]);
@@ -596,7 +596,7 @@ void TRIANGLE_MESH::buildDegenerateAsymmetricVertexPullTest(const int xSquares, 
 
   _springConstraints.clear();
 
-  // build the square corners 
+  // build the square corners
   for (int y = 0; y < ySquares + 1; y++)
     for (int x = 0; x < xSquares + 1; x++)
     {
@@ -708,7 +708,7 @@ void TRIANGLE_MESH::buildDegenerateVertexPullTest(const int xSquares, const int 
   if (yStart < 0) yStart = 0;
 
   _springConstraints.clear();
-  // build the square corners 
+  // build the square corners
   for (int y = 0; y < ySquares + 1; y++)
     for (int x = 0; x < xSquares + 1; x++)
     {
@@ -786,14 +786,14 @@ void TRIANGLE_MESH::buildDegenerateVertexPullTest(const int xSquares, const int 
       pointers.push_back(v[4]);
       _triangles.push_back(TRIANGLE(_material, pointers));
       pointers.clear();
-      
+
       // bottom
       pointers.push_back(v[0]);
       pointers.push_back(v[1]);
       pointers.push_back(v[4]);
       _triangles.push_back(TRIANGLE(_material, pointers));
       pointers.clear();
-      
+
       // right
       pointers.push_back(v[1]);
       pointers.push_back(v[2]);
@@ -836,13 +836,13 @@ void TRIANGLE_MESH::buildDegenerateVertexPullTestBottom(const int xSquares, cons
   if (yStart < 0) yStart = 0;
 
   _springConstraints.clear();
-  // build the square corners 
+  // build the square corners
   for (int y = 0; y < ySquares + 1; y++)
     for (int x = 0; x < xSquares + 1; x++)
     {
       VEC2 vertex(x * xFraction, yStart + y * xFraction);
 
-      if (x == (int)(xSquares / 2) && y == 0) 
+      if (x == (int)(xSquares / 2) && y == 0)
         vertex[0] += 0.5 * xFraction;
       if (x == (int)(xSquares / 2) + 1 && y == 0)
         vertex[0] -= 0.5 * xFraction;
@@ -895,14 +895,14 @@ void TRIANGLE_MESH::buildDegenerateVertexPullTestBottom(const int xSquares, cons
       pointers.push_back(v[4]);
       _triangles.push_back(TRIANGLE(_material, pointers));
       pointers.clear();
-      
+
       // bottom
       pointers.push_back(v[0]);
       pointers.push_back(v[1]);
       pointers.push_back(v[4]);
       _triangles.push_back(TRIANGLE(_material, pointers));
       pointers.clear();
-      
+
       // right
       pointers.push_back(v[1]);
       pointers.push_back(v[2]);
@@ -943,7 +943,7 @@ void TRIANGLE_MESH::buildHangTest(const int xSquares, const int ySquares)
   if (yStart < 0) yStart = 0;
 
   _springConstraints.clear();
-  // build the square corners 
+  // build the square corners
   for (int y = 0; y < ySquares + 1; y++)
     for (int x = 0; x < xSquares + 1; x++)
     {
@@ -998,14 +998,14 @@ void TRIANGLE_MESH::buildHangTest(const int xSquares, const int ySquares)
       pointers.push_back(v[4]);
       _triangles.push_back(TRIANGLE(_material, pointers));
       pointers.clear();
-      
+
       // bottom
       pointers.push_back(v[0]);
       pointers.push_back(v[1]);
       pointers.push_back(v[4]);
       _triangles.push_back(TRIANGLE(_material, pointers));
       pointers.clear();
-      
+
       // right
       pointers.push_back(v[1]);
       pointers.push_back(v[2]);
@@ -1046,7 +1046,7 @@ void TRIANGLE_MESH::buildDegenerateHangTest(const int xSquares, const int ySquar
   if (yStart < 0) yStart = 0;
 
   _springConstraints.clear();
-  // build the square corners 
+  // build the square corners
   for (int y = 0; y < ySquares + 1; y++)
     for (int x = 0; x < xSquares + 1; x++)
     {
@@ -1108,14 +1108,14 @@ void TRIANGLE_MESH::buildDegenerateHangTest(const int xSquares, const int ySquar
       pointers.push_back(v[4]);
       _triangles.push_back(TRIANGLE(_material, pointers));
       pointers.clear();
-      
+
       // bottom
       pointers.push_back(v[0]);
       pointers.push_back(v[1]);
       pointers.push_back(v[4]);
       _triangles.push_back(TRIANGLE(_material, pointers));
       pointers.clear();
-      
+
       // right
       pointers.push_back(v[1]);
       pointers.push_back(v[2]);
@@ -1166,7 +1166,7 @@ void TRIANGLE_MESH::scramble()
   for (unsigned int x = 0; x < _unconstrainedVertices.size(); x++)
   {
     VEC2& vertex = _vertices[_unconstrainedVertices[x]];
-    
+
     vertex[0] += rando(generator);
     vertex[1] += rando(generator);
   }
@@ -1359,7 +1359,7 @@ void TRIANGLE_MESH::drawCheckerboard()
   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
   {
     glPushMatrix();
-      glTranslatef(_vertices[_constrainedVertices[x]][0], 
+      glTranslatef(_vertices[_constrainedVertices[x]][0],
                    _vertices[_constrainedVertices[x]][1],
                    0.2);
       gluDisk(quadric, 0.0, pointSize, 20, 1);
@@ -1401,7 +1401,7 @@ void TRIANGLE_MESH::draw(const VEC4& color)
   glColor4f(1,0,0,1);
   glBegin(GL_POINTS);
   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
-    glVertex2f(_vertices[_constrainedVertices[x]][0], 
+    glVertex2f(_vertices[_constrainedVertices[x]][0],
                _vertices[_constrainedVertices[x]][1]);
   glEnd();
   */
@@ -1414,7 +1414,7 @@ void TRIANGLE_MESH::draw(const VEC4& color)
   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
   {
     glPushMatrix();
-      glTranslatef(_vertices[_constrainedVertices[x]][0], 
+      glTranslatef(_vertices[_constrainedVertices[x]][0],
                    _vertices[_constrainedVertices[x]][1],
                    0.2);
       gluDisk(quadric, 0.0, pointSize, 20, 1);
@@ -1422,13 +1422,13 @@ void TRIANGLE_MESH::draw(const VEC4& color)
   }
   */
 
- 
- /* 
+
+ /*
   // draw the unconstrained vertices
   glColor4f(0,0,1,1);
   glBegin(GL_POINTS);
   for (unsigned int x = 0; x < _unconstrainedVertices.size(); x++)
-    glVertex2f(_vertices[_unconstrainedVertices[x]][0], 
+    glVertex2f(_vertices[_unconstrainedVertices[x]][0],
                _vertices[_unconstrainedVertices[x]][1]);
   glEnd();
   */
@@ -1445,7 +1445,7 @@ void TRIANGLE_MESH::drawConstrainedVertices()
   for (unsigned int x = 0; x < _constrainedVertices.size(); x++)
   {
     glPushMatrix();
-      glTranslatef(_vertices[_constrainedVertices[x]][0], 
+      glTranslatef(_vertices[_constrainedVertices[x]][0],
                    _vertices[_constrainedVertices[x]][1],
                    0.2);
       gluDisk(quadric, 0.0, pointSize, 20, 1);
@@ -1609,10 +1609,10 @@ void TRIANGLE_MESH::stepExplicit()
   // get the material forces
   _f.setZero();
   computeMaterialForces();
-  
+
   // dt^2 appears from the demoninator of the acceleration finite difference
-  VECTOR rhs = M * (2.0 * _u - _uOld) + 
-               dt * 0.5 * C * _uOld + 
+  VECTOR rhs = M * (2.0 * _u - _uOld) +
+               dt * 0.5 * C * _uOld +
                dt * dt * (_f + _fExternal);
 
   if (verbose)
@@ -1661,6 +1661,8 @@ void TRIANGLE_MESH::addBodyForce(const VEC2& bodyForce)
 }
 
 ///////////////////////////////////////////////////////////////////////
+//TO DO: LOOK AT THIS CODE FOR SPARSE MATRIX EXAMPLE
+// VECTOR OF TRIPLETS THAT GETS PASSED TO SPARSE STIFFNESS MATRIX BUILD
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::stepImplicit()
 {
@@ -1674,7 +1676,7 @@ void TRIANGLE_MESH::stepImplicit()
   // implicit Newmark
   const Real beta = 0.25;
   const Real gamma = 0.5;
-  
+
   // implicit Euler
   //const Real beta = 0.5;
   //const Real gamma = 1.0;
@@ -1726,7 +1728,7 @@ void TRIANGLE_MESH::stepImplicit()
     //MATRIX C = dampingAlpha * M + dampingBeta * K;
     if (newtonIterations == 0)
       C = dampingAlpha * M + dampingBeta * K;
-    
+
     // build the right hand side
     _f.setZero();
     computeMaterialForces();
@@ -1744,7 +1746,7 @@ void TRIANGLE_MESH::stepImplicit()
       cout << " NEWTON STEP: " << newtonIterations << endl;
       cout << " f:   " << padTo3(_f).transpose() << endl;
       cout << " rhs: " << padTo3(rhs).transpose() << endl;
-      
+
       VECTOR massRHS = M * (alpha1 * (_u - _uOld) - alpha2 * _velocity - alpha3 * _acceleration);
       VECTOR dampingRHS = C * (alpha4 * (_u - _uOld) + alpha5 * _velocity + alpha6 * _acceleration);
       cout << " mass rhs:    " << padTo3(massRHS).transpose() << endl;
@@ -1757,7 +1759,7 @@ void TRIANGLE_MESH::stepImplicit()
 
     // all the matrices needed to be built to compute C anyway,
     // so this is the earliest possible break to save on the solve
-    if (residual < eps) 
+    if (residual < eps)
     {
       cout << " Residual is good enough (eps = " << eps << ")." << endl;
       break;
@@ -1830,7 +1832,7 @@ bool TRIANGLE_MESH::stepQuasistaticSandbox()
 
   VECTOR bestVector;
   Real bestSeen = 0;
-  
+
   SPARSE_MATRIX K(_DOFs, _DOFs);
   while (residual > eps && newtonIterations < maxNewtonIterations)
   {
@@ -1850,7 +1852,7 @@ bool TRIANGLE_MESH::stepQuasistaticSandbox()
 #if USING_CONDITION_NUMBER
     Real minEig = getMinEig(K);
     Real maxEig = getMaxEig(K);
-    Real conditionNumber = maxEig / minEig; 
+    Real conditionNumber = maxEig / minEig;
 #endif
 */
 
@@ -1918,12 +1920,12 @@ bool TRIANGLE_MESH::stepQuasistaticSandbox()
 #else
     cout << " Solving Cholesky ... " << flush;
     TIMER choleskyTimer("Cholesky");
-    MATRIX denseK = MATRIX(K);    
+    MATRIX denseK = MATRIX(K);
     LLT<MATRIX> llt;
     llt.compute(denseK);
     VECTOR uDelta= llt.solve(rhs);
     choleskyTimer.stop();
-    
+
     if (newtonIterations == 0)
     {
 #if USING_CONDITION_NUMBER
@@ -1950,7 +1952,7 @@ bool TRIANGLE_MESH::stepQuasistaticSandbox()
     newtonIterations++;
   }
   _newtonSeen += newtonIterations;
-  
+
   // clear out any gravity forces
   _fExternal.setZero();
 
@@ -2011,7 +2013,7 @@ bool TRIANGLE_MESH::stepQuasistaticWithLineSearch()
 
   VECTOR bestVector;
   Real bestSeen = 0;
-  
+
   //MATRIX K(_DOFs, _DOFs);
   SPARSE_MATRIX K(_DOFs, _DOFs);
   while (residual > eps && newtonIterations < maxNewtonIterations)
@@ -2030,7 +2032,7 @@ bool TRIANGLE_MESH::stepQuasistaticWithLineSearch()
 #if USING_CONDITION_NUMBER
     Real minEig = getMinEig(K);
     Real maxEig = getMaxEig(K);
-    Real conditionNumber = maxEig / minEig; 
+    Real conditionNumber = maxEig / minEig;
 #endif
 
     // build the right hand side
@@ -2094,12 +2096,12 @@ bool TRIANGLE_MESH::stepQuasistaticWithLineSearch()
 #else
     cout << " Solving Cholesky ... " << flush;
     TIMER choleskyTimer("Cholesky");
-    MATRIX denseK = MATRIX(K);    
+    MATRIX denseK = MATRIX(K);
     LLT<MATRIX> llt;
     llt.compute(denseK);
     VECTOR uDelta= llt.solve(rhs);
     choleskyTimer.stop();
-    
+
     if (newtonIterations == 0)
     {
 #if USING_CONDITION_NUMBER
@@ -2123,7 +2125,7 @@ bool TRIANGLE_MESH::stepQuasistaticWithLineSearch()
     newtonIterations++;
   }
   _newtonSeen = newtonIterations;
-  
+
   // clear out any gravity forces
   _fExternal.setZero();
 
@@ -2180,7 +2182,7 @@ bool TRIANGLE_MESH::stepQuasistatic()
 
   VECTOR bestVector;
   Real bestSeen = 0;
-  
+
   //MATRIX K(_DOFs, _DOFs);
   SPARSE_MATRIX K(_DOFs, _DOFs);
   while (residual > eps && newtonIterations < maxNewtonIterations)
@@ -2272,7 +2274,7 @@ bool TRIANGLE_MESH::stepQuasistatic()
     newtonIterations++;
   }
   _newtonSeen = newtonIterations;
-  
+
   // clear out any gravity forces
   _fExternal.setZero();
 
@@ -2393,7 +2395,7 @@ void TRIANGLE_MESH::computeStiffnessMatrixSparseSandbox(SPARSE_MATRIX& K)
   {
     // is this one degenerate?
     MATRIX localK(6,6);
-    if (!_isDegenerate[x]) 
+    if (!_isDegenerate[x])
       localK = _triangles[x].computeForceJacobianDEC();
     else
 #if ZEROING_DEGENERATES
@@ -2699,7 +2701,7 @@ void TRIANGLE_MESH::addSpringStiffnesses(SPARSE_MATRIX& K)
 }
 
 ///////////////////////////////////////////////////////////////////////
-// debugging function -- hand it the solution to 
+// debugging function -- hand it the solution to
 // the compression test, see if it is recognized
 ///////////////////////////////////////////////////////////////////////
 void TRIANGLE_MESH::setCompressionSolution(const Real squash)
@@ -2807,14 +2809,14 @@ void TRIANGLE_MESH::stepStretchTest(const Real stretch)
 }
 
 ///////////////////////////////////////////////////////////////////////
-// do a backtracking search in this direction and see if there's a 
+// do a backtracking search in this direction and see if there's a
 // better alpha value
 ///////////////////////////////////////////////////////////////////////
 Real TRIANGLE_MESH::backtrackingLineSearchSandbox(const Real original, const VECTOR& direction)
 {
   Real oldEnergy = original;
   Real newEnergy = oldEnergy;
-  int iterations = 0; 
+  int iterations = 0;
   const int maxIterations = 100;
   cout << " Original energy: " << original << std::endl;
 
@@ -2843,14 +2845,14 @@ Real TRIANGLE_MESH::backtrackingLineSearchSandbox(const Real original, const VEC
 }
 
 ///////////////////////////////////////////////////////////////////////
-// do a backtracking search in this direction and see if there's a 
+// do a backtracking search in this direction and see if there's a
 // better alpha value
 ///////////////////////////////////////////////////////////////////////
 Real TRIANGLE_MESH::backtrackingLineSearch(const Real original, const VECTOR& direction)
 {
   Real oldEnergy = original;
   Real newEnergy = oldEnergy;
-  int iterations = 0; 
+  int iterations = 0;
   const int maxIterations = 100;
   cout << " Original energy: " << original << std::endl;
 
@@ -3191,7 +3193,7 @@ void TRIANGLE_MESH::readShewchukTriangles(const string& prefix)
 
   for (int x = 0; x < _vertices.size(); x++)
   {
-    if (fabs(_vertices[x][0] - mins[0]) < 1e-4 || 
+    if (fabs(_vertices[x][0] - mins[0]) < 1e-4 ||
         fabs(_vertices[x][0] - maxs[0]) < 1e-4)
       _constrainedVertices.push_back(x);
     else
