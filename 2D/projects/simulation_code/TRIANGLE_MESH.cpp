@@ -211,6 +211,7 @@ void TRIANGLE_MESH::buildBlob(const char* filename, bool reduced, int cols)
   }
   else
   {
+    // basisNoTranslation(filename, 70);
     size = _unconstrainedVertices.size()*2;
   }
 
@@ -778,6 +779,7 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
 bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 {
   MATRIX K; //stiffness matrix
+  _f.setZero();
 
   if(reduced)
   {
@@ -791,8 +793,14 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
     // printf("reduced stiffness matrix:\n");
     // printMatrix(K);
     //
-    printf("\n reduced material forces:\n");
-    printVector(_U*_f);
+    // printf("\n reduced material forces:\n");
+    // printVector(_U*_f);
+
+    MATRIX u_id = _U * _U.transpose();
+
+    printf("this should be an identity matrix of size %ld, %ld\n", u_id.rows(), u_id.cols());
+    printMatrix(u_id);
+    u_id.resize(0,0);
     //
     // printf("\n\n-------------------------------------------------\n\n");
 
@@ -824,6 +832,8 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 
     printf("\ninternal force:\n");
     printVector(_f);
+    // printMatrix(_U * _U.transpose());
+    // printVector(_U * (_U.transpose() * _f));
     // printf("\n -------------------------------- \n \n");
 
     VECTOR r2 = -1*(_f + _fExternal);
@@ -833,12 +843,12 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
     _u += x2;
   }
 
-  //step 7: update all node positions w new displacement vector
+  // step 7: update all node positions w new displacement vector
   uScatter();
 
-  //reset forces to 0
+  // reset forces to 0
   _fExternal.setZero();
-  _f.setZero();
+  // _f.setZero();
   K.resize(0,0);
 
   return true;
