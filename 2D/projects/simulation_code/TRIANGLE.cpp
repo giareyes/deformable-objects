@@ -3,7 +3,7 @@
 // determines what kind of material we are using. 0 = STVK, 1 = NEOHOOKEAN.
 // NOTE: IF YOU CHANGE THIS VALUE HERE, YOU MUST CHANGE IT IN TRIANGLE_MESH.cpp
 // AS WELL!!!
-#define MATMODEL 0
+#define MATMODEL 1
 #include <iostream>
 using namespace std;
 

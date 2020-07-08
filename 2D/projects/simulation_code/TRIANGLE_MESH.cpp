@@ -7,7 +7,7 @@
 // determines what kind of material we are using. 0 = STVK, 1 = NEOHOOKEAN.
 // NOTE: IF YOU CHANGE THIS VALUE HERE, YOU MUST CHANGE IT IN TRIANGLE.cpp
 // AS WELL!!!
-#define MATMODEL 0
+#define MATMODEL 1
 #include "STVK.h"
 #include "NEOHOOKEAN.h"
 
@@ -791,13 +791,13 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
     // printf("reduced stiffness matrix:\n");
     // printMatrix(K);
     //
-    // printf("\n reduced material forces:\n");
-    // printVector(_f);
+    printf("\n reduced material forces:\n");
+    printVector(_U*_f);
     //
     // printf("\n\n-------------------------------------------------\n\n");
 
     VECTOR reducedF = _U.transpose() * _fExternal;
-    VECTOR r2 = -1*(_f + reducedF);
+    VECTOR r2 = -_f - reducedF;
 
     // solve for change in displacement
     VECTOR x2 = K.colPivHouseholderQr().solve(r2);
@@ -822,8 +822,8 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 
     computeUnprecomputedMaterialForces();
 
-    // printf("internal force:\n");
-    // printVector(_f);
+    printf("\ninternal force:\n");
+    printVector(_f);
     // printf("\n -------------------------------- \n \n");
 
     VECTOR r2 = -1*(_f + _fExternal);

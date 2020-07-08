@@ -65,6 +65,7 @@ public:
   std::vector<int>& unconstrainedVertices() { return _unconstrainedVertices; };
   void setDisplacement(int index, float d) { _u[index] = d; };
   VECTOR getDisplacement() {return _u; };
+  VECTOR getInternalForce() {return _f; };
   const std::vector<int>& constrainedVertices() { return _constrainedVertices; };
   vector<WALL>& walls() { return _walls; };
 

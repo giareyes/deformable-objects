@@ -484,11 +484,17 @@ void readCommandLine(int argc, char** argv)
         }
         basisBuild.stepQuasistatic(false);
         VECTOR displacements = basisBuild.getDisplacement();
+        VECTOR force = basisBuild.getInternalForce();
         int u_size = displacements.size();
-        if( i == 0 && j == 0 ) fprintf(file, "%i %i\n", u_size, 60);
+        if( i == 0 && j == 0 ) fprintf(file, "%i %i\n", u_size, 120);
 
         for(int k = 0; k < u_size; k++)
           fprintf(file, "%lf ", displacements[k]);
+
+        fprintf(file, "\n");
+
+        for(int k = 0; k < u_size; k++)
+          fprintf(file, "%lf ", force[k]/force.norm());
 
         fprintf(file, "\n");
       }
