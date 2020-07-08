@@ -19,14 +19,14 @@ public:
   void addWall(const WALL& wall)             { _walls.push_back(wall); };
 
   // build the deformable model
-  void buildBlob(int sceneNum, const char* filename, bool create_basis, int cols);
+  void buildBlob(const char* filename, bool reduced, int cols);
 
   // take a step
-  bool stepQuasistatic();
+  bool stepQuasistatic(bool reduced);
 
 //----------------------------------------------------------
   // Euler's equation of motion
-  void stepMotion(float dt, const VEC2& outerForce, int sceneNum);
+  void stepMotion(float dt, const VEC2& outerForce);
 
   // regular equation of motion
   void setMassMatrix(bool reduction);

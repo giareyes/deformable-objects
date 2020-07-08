@@ -34,7 +34,7 @@ TRIANGLE_MESH::~TRIANGLE_MESH()
   delete _material;
 }
 
-void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_basis, int cols)
+void TRIANGLE_MESH::buildBlob(const char* filename, bool reduced, int cols)
 {
   _vertices.clear();
   _triangles.clear();
@@ -112,7 +112,8 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
         _vertices[i][1] += (-0.95 - mins[1]);
         _restVertices[i][1] += (-0.95 - mins[1]);
 
-        (_restVertices[i][1] < -0.85 || (_restVertices[i][1] > maxs[1] - 1.05 - mins[1]))? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
+        // (_restVertices[i][1] < -0.85 || (_restVertices[i][1] > maxs[1] - 1.05 - mins[1]))? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
+        (_restVertices[i][1] < -0.85)? _constrainedVertices.push_back(i) : _unconstrainedVertices.push_back(i);
       }
     }
   }
@@ -198,25 +199,23 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
   _DOFs = 2 * (_vertices.size() - _constrainedVertices.size());
 
   // if this is not a motion sim with translation
-  if (sceneNum)
+  if (reduced)
   {
-    size = _unconstrainedVertices.size()*2;
-    if(!create_basis)
-      basisNoTranslation(filename, cols);
+    basisNoTranslation(filename, cols);
+    size = _U.cols();
   }
   else
   {
     // this function doesn't actually work - currently motion won't be reduced
-    setBasisReduction();
-    size = _vertices.size()*2;
+    size = _unconstrainedVertices.size()*2;
   }
 
   // create the mass matrix
-  setMassMatrix(!create_basis);
+  setMassMatrix(reduced);
 
   // set all vectors to zero and determine their size
-  VECTOR zeros(size);
-  VECTOR z2(_U.cols());
+  VECTOR zeros(_unconstrainedVertices.size()*2);
+  VECTOR z2(size);
 
   z2.setZero();
   zeros.setZero();
@@ -234,7 +233,7 @@ void TRIANGLE_MESH::buildBlob(int sceneNum, const char* filename, bool create_ba
   computeVertexToIndexTable();
 
   // if we aren't creating a basis, then create the tensor coefficients for precomputed method
-  if(!create_basis)
+  if(reduced)
     createCoefs();
 }
 
@@ -807,7 +806,7 @@ void TRIANGLE_MESH::checkCollision()
 ///////////////////////////////////////////////////////////////////////
 // Motion step using Euler-Lagrange equation of motion
 ///////////////////////////////////////////////////////////////////////
-void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
+void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
 {
   //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
   // MATRIX K(_u.size(),_u.size() );
@@ -820,13 +819,6 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
   MATRIX inverse;
   float alpha = 0.01; // constant for damping
   float beta = 0.02;  // constant for damping
-
-  // in barbic, idk if you need to check collision with the wall.
-  if (sceneNum == 0)
-  {
-    printf("checking collision\n");
-    checkCollision();
-  }
 
   // Newton Raphson Iteration, but j-max is 1 so no need to write the loop
   //step 1: compute K
@@ -895,34 +887,70 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, int sceneNum)
 ///////////////////////////////////////////////////////////////////////
 // a quasistatic step
 ///////////////////////////////////////////////////////////////////////
-bool TRIANGLE_MESH::stepQuasistatic()
+bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 {
-  //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
-  MATRIX K(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
-  // MATRIX K(_u.size(),_u.size());
-  // MATRIX K(_q.size(),_q.size());
+  MATRIX K; //stiffness matrix
 
-  //step 1: compute K
-  K.setZero();
-  computeUnprecomputedStiffnessMatrix(K);
+  if(reduced)
+  {
+    K.resize(_q.size(), _q.size());
+    K.setZero();
 
-  //step 2: compute internal material forces, R(uq)
-  computeUnprecomputedMaterialForces();
+    // compute K and R
+    computeStiffnessMatrix(K);
+    computeMaterialForces();
 
-  // //step 3: external forces transform
-  // VECTOR reducedF = _U.transpose() * _fExternal;
+    // printf("reduced stiffness matrix:\n");
+    // printMatrix(K);
+    //
+    printf("\n reduced material forces:\n");
+    printVector(_U*_f);
+    //
+    // printf("\n\n-------------------------------------------------\n\n");
 
-  // step 4: form the residual (r = F + E)
-  VECTOR r2 = -1*(_f + _fExternal);
-  // VECTOR r2 = -1*(_f + reducedF);
+    VECTOR reducedF = _U.transpose() * _fExternal;
+    VECTOR r2 = -_f - reducedF;
 
-  //step 5: compute x = K .inverse().eval()  * r
-  // MATRIX inverse2 = K.inverse().eval();
-  // VECTOR x2 = inverse2*r2;
-  VECTOR x2 = K.colPivHouseholderQr().solve(r2);
+    // solve for change in displacement
+    VECTOR x2 = K.colPivHouseholderQr().solve(r2);
 
-  //step 6: add solution x to displamcement vector _u
-  _u += x2;
+    _q += x2;
+    qTou();
+
+    // printf("\n displacement:\n");
+    // printVector(_u);
+  }
+  else
+  {
+    //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
+    K.resize(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
+    // MATRIX K(_u.size(),_u.size());
+    // MATRIX K(_q.size(),_q.size());
+
+    //step 1: compute K
+    K.setZero();
+    computeUnprecomputedStiffnessMatrix(K);
+
+    //step 2: compute internal material forces, R(uq)
+    computeUnprecomputedMaterialForces();
+
+    printVector(_f);
+
+    // //step 3: external forces transform
+    // VECTOR reducedF = _U.transpose() * _fExternal;
+
+    // step 4: form the residual (r = F + E)
+    VECTOR r2 = -1*(_f + _fExternal);
+    // VECTOR r2 = -1*(_f + reducedF);
+
+    //step 5: compute x = K .inverse().eval()  * r
+    // MATRIX inverse2 = K.inverse().eval();
+    // VECTOR x2 = inverse2*r2;
+    VECTOR x2 = K.colPivHouseholderQr().solve(r2);
+
+    //step 6: add solution x to displamcement vector _u
+    _u += x2;
+  }
   // _q += x2;
   // qTou();
 

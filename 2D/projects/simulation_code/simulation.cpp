@@ -39,6 +39,7 @@ int mouseModifiers = -1;
 bool animate = false;
 bool singleStep = false;
 bool createBasis = false;
+bool reduced = false;
 // float dt = 1.0/15360.0;
 float dt = 1.0/100.0;
 
@@ -63,7 +64,7 @@ VEC2 bodyForce;
 
 enum SCENE { STRETCH, SQUASH, LSHEAR, RSHEAR, SINGLE, MOTION};
 SCENE scene = SINGLE;
-int sceneNum = 1;
+int sceneNum = 0;
 
 int meshFlag = 0;
 
@@ -337,12 +338,12 @@ void glutIdle()
         {
           triangleMesh.addBodyForce(bodyForce);
         }
-        triangleMesh.stepMotion(dt, bodyForce, sceneNum);
+        triangleMesh.stepMotion(dt, bodyForce);
       }
     }
     else
     {
-      triangleMesh.stepQuasistatic();
+      triangleMesh.stepQuasistatic(reduced);
     }
     frame++;
 
@@ -433,7 +434,7 @@ void readCommandLine(int argc, char** argv)
     else
     {
       scene = MOTION;
-      sceneNum = 0;
+      sceneNum = 1;
     }
 
     if (argc > 3)
@@ -442,11 +443,11 @@ void readCommandLine(int argc, char** argv)
       {
         if (argv[x][1] == 'm')
           meshFlag = 1;
-        else if (argv[x][1] == 'b')
-          sceneNum = 1;
+        else if (argv[x][1] == 'n')
+          createBasis = true;
         else if (argv[x][1] == 'q')
         {
-          createBasis = true;
+          reduced = true;
           if( x + 1 == argc )
           {
             cout << " invalid number of arguments. Need an int after the -q flag" << endl;
@@ -461,7 +462,7 @@ void readCommandLine(int argc, char** argv)
   else
   {
     scene = MOTION;
-    sceneNum = 0;
+    sceneNum = 1;
   }
 
   // if we are creating a basis, we must create a file with all of the deformations we will be using
@@ -469,6 +470,7 @@ void readCommandLine(int argc, char** argv)
   // not necessarily creating the basis file ? but this is necessary for now if we want to run quasistatics
   if(createBasis)
   {
+    printf("create basis\n");
     FILE* file = NULL;
 
     string filename = argv[1] + string(".basis");
@@ -477,26 +479,34 @@ void readCommandLine(int argc, char** argv)
     for(int i = 0; i < 4; i++)
     {
       TRIANGLE_MESH basisBuild(poissonsRatio, youngsModulus);
-      basisBuild.buildBlob(1, argv[1], true, 0);
+      basisBuild.buildBlob(argv[1], false, 0);
       bodyForce[0] = 0;
-      bodyForce[1] = -0.3;
+      bodyForce[1] = 0;
       for(int j = 0; j < 15; j++)
       {
         switch(i) {
           case 0:
-            basisBuild.stretch2(0.002);
+            // basisBuild.stretch2(0.002);
+            bodyForce[1] = 0.0005;
+            basisBuild.addBodyForce(bodyForce);
             break;
           case 1:
-            basisBuild.stepShearTest(0.002);
+            // basisBuild.stepShearTest(0.002);
+            bodyForce[0] = 0.0005;
+            basisBuild.addBodyForce(bodyForce);
             break;
           case 2:
-            basisBuild.stepShearTest(-0.002);
+            // basisBuild.stepShearTest(-0.002);
+            bodyForce[0] = -0.0005;
+            basisBuild.addBodyForce(bodyForce);
             break;
           case 3:
-            basisBuild.stretch2(-0.002);
+            // basisBuild.stretch2(-0.002);
+            bodyForce[1] = -0.0005;
+            basisBuild.addBodyForce(bodyForce);
             break;
         }
-        basisBuild.stepQuasistatic();
+        basisBuild.stepQuasistatic(false);
         VECTOR displacements = basisBuild.getDisplacement();
         int u_size = displacements.size();
         if( i == 0 && j == 0 ) fprintf(file, "%i %i\n", u_size, 60);
@@ -509,16 +519,16 @@ void readCommandLine(int argc, char** argv)
     }
     fclose(file);
     // build the scene
-    triangleMesh.buildBlob(sceneNum, argv[1], false, basisCols);
+    triangleMesh.buildBlob(argv[1], reduced, basisCols);
   }
   else
   {
     // build the scene
-    triangleMesh.buildBlob(sceneNum, argv[1], true, 0);
+    triangleMesh.buildBlob( argv[1], reduced, basisCols);
   }
 
   bodyForce[0] = 0;
-  bodyForce[1] = -0.3;
+  bodyForce[1] = -0.0005;
 
   triangleMesh.addWall(WALL(VEC2(1,0), VEC2(-0.98,0)));
   triangleMesh.addWall(WALL(VEC2(-1,0), VEC2(0.98,0)));
