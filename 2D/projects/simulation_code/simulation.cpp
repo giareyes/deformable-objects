@@ -315,7 +315,7 @@ void glutIdle()
     {
       for( int i = 0; i < 15; i ++)
       {
-        triangleMesh.stepMotion(dt, bodyForce);
+        triangleMesh.stepMotion(dt, bodyForce, reduced);
       }
     }
     else
@@ -458,6 +458,8 @@ void readCommandLine(int argc, char** argv)
       basisBuild.buildBlob(argv[1], false, 0);
       bodyForce[0] = 0;
       bodyForce[1] = 0;
+      int u_size;
+
       for(int j = 0; j < 15; j++)
       {
         switch(i) {
@@ -485,11 +487,12 @@ void readCommandLine(int argc, char** argv)
         basisBuild.stepQuasistatic(false);
         VECTOR displacements = basisBuild.getDisplacement();
         VECTOR force = basisBuild.getInternalForce();
-        int u_size = displacements.size();
-        if( i == 0 && j == 0 ) fprintf(file, "%i %i\n", u_size, 120);
+        printVector(force);
+        u_size = displacements.size();
+        if( i == 0 && j == 0 ) fprintf(file, "%i %i\n", u_size, 124); // 124 because 4 tests * 15 iterations * (displacements and internal force) + 4 different external forces
 
         for(int k = 0; k < u_size; k++)
-          fprintf(file, "%lf ", displacements[k]);
+          fprintf(file, "%lf ", displacements[k]/displacements.norm());
 
         fprintf(file, "\n");
 
@@ -498,6 +501,25 @@ void readCommandLine(int argc, char** argv)
 
         fprintf(file, "\n");
       }
+
+      // create an external force vector
+      VECTOR Eforce(u_size);
+      Eforce.setZero();
+
+      // we can't get this vector from the object itself since it zeroes out at the end of every iteration, so we must
+      // recreate it using the code below
+      int counter = 0;
+      if(bodyForce[0] == 0)
+        counter = 1;
+
+      for(int i = counter; i < u_size; i += 2)
+        (counter == 0)? Eforce[i] = bodyForce[0] : Eforce[i] = bodyForce[1];
+
+      // add normalized external force to the basis matrix
+      for(int k = 0; k < u_size; k++)
+        fprintf(file, "%lf ", Eforce[k]/Eforce.norm());
+
+      fprintf(file, "\n");
     }
     fclose(file);
     // build the scene
@@ -511,7 +533,6 @@ void readCommandLine(int argc, char** argv)
 
   bodyForce[0] = 0;
   bodyForce[1] = -0.0005;
-  // bodyForce[1] = -0.0005;
 
   triangleMesh.addWall(WALL(VEC2(1,0), VEC2(-0.98,0)));
   triangleMesh.addWall(WALL(VEC2(-1,0), VEC2(0.98,0)));

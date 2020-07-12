@@ -27,7 +27,7 @@ public:
 
 //----------------------------------------------------------
   // Euler's equation of motion
-  void stepMotion(float dt, const VEC2& outerForce);
+  void stepMotion(float dt, const VEC2& outerForce, bool reduced);
 
   // regular equation of motion
   void setMassMatrix(bool reduction);
@@ -66,6 +66,7 @@ public:
   void setDisplacement(int index, float d) { _u[index] = d; };
   VECTOR getDisplacement() {return _u; };
   VECTOR getInternalForce() {return _f; };
+  VECTOR getExternalForce() {return _fExternal; };
   const std::vector<int>& constrainedVertices() { return _constrainedVertices; };
   vector<WALL>& walls() { return _walls; };
 

@@ -211,6 +211,7 @@ void TRIANGLE_MESH::buildBlob(const char* filename, bool reduced, int cols)
   }
   else
   {
+    // commented line before is for testing - will only run if the basis file has already been created
     // basisNoTranslation(filename, 70);
     size = _unconstrainedVertices.size()*2;
   }
@@ -704,36 +705,17 @@ void TRIANGLE_MESH::computeUnprecomputedMaterialForces()
 ///////////////////////////////////////////////////////////////////////
 // Motion step using Euler-Lagrange equation of motion
 ///////////////////////////////////////////////////////////////////////
-void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
+void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce, bool reduced)
 {
-  //make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
-  // MATRIX K(_u.size(),_u.size() );
-  // MATRIX D(_u.size(),_u.size() );
-
-  //reduced
-  MATRIX K(_q.size(),_q.size() );
-  MATRIX D(_q.size(),_q.size() );
+  MATRIX K;
+  MATRIX D;
+  VECTOR dq;
 
   MATRIX inverse;
   float alpha = 0.01; // constant for damping
   float beta = 0.02;  // constant for damping
 
-  // Newton Raphson Iteration, but j-max is 1 so no need to write the loop
-  //step 1: compute K
-  K.setZero();
-  computeStiffnessMatrix(K);
-
-  // step 2: compute D
-  D = alpha*_mass - beta*K;
-
-  // step 3: calculate f_external
-  // VECTOR reducedF = _fExternal;
-  VECTOR reducedF = _U.transpose() * _fExternal;
-
-  // step 4: compute R(q+1)
-  computeMaterialForces();
-
-  // step 5: calculate a1 - a6 with beta  0.25 and gamma = 0.5
+  // calculate a1 - a6 with beta  0.25 and gamma = 0.5
   float betat = 0.25;
   float gamma = 0.5;
   float a1 = 1.0 / (betat* pow(dt, 2));
@@ -743,31 +725,79 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
   float a5 = 1.0 - (gamma/betat);
   float a6 = (1.0 - (gamma/(2*betat)))*dt;
 
-  // step 6: solve the equations
-  VECTOR rightSolve = -1*((-1*a3*_mass + a6*D)*_ra + (-1*a2*_mass + a5*D)*_rv - _f - reducedF);
-  MATRIX leftMatrix = a1*_mass + a4*D - K;
-  inverse = leftMatrix.inverse().eval();
+  if(reduced)
+  {
+    K.resize(_q.size(),_q.size() );
+    D.resize(_q.size(),_q.size() );
 
-  VECTOR dq = inverse*rightSolve;
+    // Newton Raphson Iteration, but j-max is 1 so no need to write the loop
+    //step 1: compute K
+    K.setZero();
+    computeStiffnessMatrix(K);
 
-  // free space
-  leftMatrix.resize(0,0);
-  inverse.resize(0,0);
+    // step 2: compute D
+    D = alpha*_mass - beta*K;
 
-  // step 7: update q and u
-  // _u += dq;
-  _q += dq;
-  qTou();
+    // step 3: compute reduced external force and R(q+1)
+    VECTOR reducedF = _U.transpose() * _fExternal;
+    computeMaterialForces();
 
-  // step 8: update all node positions w new displacement vector
+    // step 4: solve the equations
+    VECTOR rightSolve = -1*((-1*a3*_mass + a6*D)*_ra + (-1*a2*_mass + a5*D)*_rv - _f - reducedF);
+    MATRIX leftMatrix = a1*_mass + a4*D - K;
+    inverse = leftMatrix.inverse().eval();
+
+    dq = inverse*rightSolve;
+
+    // free space
+    leftMatrix.resize(0,0);
+    inverse.resize(0,0);
+
+    // step 5: update q and u
+    _q += dq;
+    qTou();
+  }
+  else
+  {
+    // make stiffness Matrix K. size is 2*unrestrained vertices x  2*unrestrained vertices
+    K.resize(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
+    D.resize(_unconstrainedVertices.size()*2,_unconstrainedVertices.size()*2);
+
+    // Newton Raphson Iteration, but j-max is 1 so no need to write the loop
+    //step 1: compute K
+    K.setZero();
+    computeUnprecomputedStiffnessMatrix(K);
+
+    // step 2: compute D
+    D = alpha*_mass - beta*K;
+
+    // step 3: compute R(q+1)
+    computeUnprecomputedMaterialForces();
+
+    // step 4: solve the equations
+    VECTOR rightSolve = -1*((-1*a3*_mass + a6*D)*_ra + (-1*a2*_mass + a5*D)*_rv - _f - _fExternal);
+    MATRIX leftMatrix = a1*_mass + a4*D - K;
+    inverse = leftMatrix.inverse().eval();
+
+    dq = inverse*rightSolve;
+
+    // free space
+    leftMatrix.resize(0,0);
+    inverse.resize(0,0);
+
+
+    // step 5: update u
+    _u += dq;
+  }
+
+  // step 6: update all node positions w new displacement vector
   uScatter();
 
-  // step 9: calculate velocity and accleration
+  // step 7: calculate velocity and accleration
   VECTOR newVel = a4*dq + a5*_rv + a6*_ra;
   _ra = a1*dq - a2*_rv - a3*_ra;
   _rv = newVel;
-  _velocity = _U*_rv;
-  // _velocity = _rv;
+  (reduced)? _velocity = _U*_rv : _velocity = _rv;
 
   _fExternal.setZero();
   _f.setZero();
@@ -779,7 +809,7 @@ void TRIANGLE_MESH::stepMotion(float dt, const VEC2& outerForce)
 bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 {
   MATRIX K; //stiffness matrix
-  _f.setZero();
+  _f.setZero(); // this reset used to be at the bottom with the external force reset, but then we can't access internal force after the iteration is over
 
   if(reduced)
   {
@@ -796,15 +826,8 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
     // printf("\n reduced material forces:\n");
     // printVector(_U*_f);
 
-    MATRIX u_id = _U * _U.transpose();
-
-    printf("this should be an identity matrix of size %ld, %ld\n", u_id.rows(), u_id.cols());
-    printMatrix(u_id);
-    u_id.resize(0,0);
-    //
-    // printf("\n\n-------------------------------------------------\n\n");
-
     VECTOR reducedF = _U.transpose() * _fExternal;
+    printVector(_f);
     VECTOR r2 = -_f - reducedF;
 
     // solve for change in displacement
@@ -823,17 +846,17 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 
     // compute K and R
     computeUnprecomputedStiffnessMatrix(K);
-
-    // printf("stiffness matrix:\n");
-    // printMatrix(K);
-    // printf("\n -------------------------------- \n \n");
-
     computeUnprecomputedMaterialForces();
 
-    printf("\ninternal force:\n");
-    printVector(_f);
+    // printf("\ninternal force:\n");
+    // printVector(_f);
+    //
+    // VECTOR unprojected = _U * (_U.transpose() * _f);
+    //
+    // VECTOR diff = (_f - unprojected);
+    //
+    // printf("%f\n", (diff.norm() / _f.norm()));
     // printMatrix(_U * _U.transpose());
-    // printVector(_U * (_U.transpose() * _f));
     // printf("\n -------------------------------- \n \n");
 
     VECTOR r2 = -1*(_f + _fExternal);
@@ -848,7 +871,6 @@ bool TRIANGLE_MESH::stepQuasistatic(bool reduced)
 
   // reset forces to 0
   _fExternal.setZero();
-  // _f.setZero();
   K.resize(0,0);
 
   return true;
