@@ -15,27 +15,22 @@
 }
 \DeclareMathOperator{\vect}{vec}
 \DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\detF}{det}
 \begin{document}
 
 \maketitle
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{abstract}
-{\it Insert Abstract Here
-}
-\end{abstract}
-
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
 
-The goal of this project is to document each step taken so far in creating a reduced-order simulation of the Stable Neo-Hookean approach to deformable solids.
+The goal of this project is to document each step taken so far in creating a reduced-order simulation of the Stable Neo-Hookean approach to deformable solids \cite{kim}. The approach is identical to the StVK reduced-order simulation except in calculating internal force - the Finite Element Method is used to discretize partial differential equations of solid continuum mechanics, allowing the motion to be described through the Euler-Lagrange equation,
 
 \begin{equation}
 \bm{M\ddot u} + \bm{D}(\bm{u}, \bm{\dot u}) + \bm{R}(\bm{u}) = \bm{f}
 \label{eq_motion}
 \end{equation}
 
-\noindent where $\bm{M} \in \mathbb{R}^{2n \times 2n }$ is the mass matrix, $\bm{D}$ is the damping force, $\bm{R}$ is internal force, and $\bm{f}$ is external force. $\bm{u} \in \mathbb{R}^{2n}$ is the displacement vector. This equation is then reduced by introducing a time-independent matrix, $\bm{U} \in \mathbb{R}^{2n \times r}$, specifying a basis of some r-dimensional linear subspace. After reduction, the equation becomes:
+\noindent where $\bm{M} \in \mathbb{R}^{2n \times 2n }$ is the mass matrix, $\bm{D}$ is the damping force, $\bm{R}$ is internal force, and $\bm{f}$ is external force \cite{barbic}. $\bm{u} \in \mathbb{R}^{2n}$ is the displacement vector. This equation is then reduced by introducing a time-independent matrix, $\bm{U} \in \mathbb{R}^{2n \times r}$, specifying a basis of some r-dimensional linear subspace. After reduction, the equation becomes:
 
 \begin{equation}
 \bm{\tilde{M}\ddot q} + \bm{\tilde{D}}(\bm{q}, \bm{\dot q}) + \bm{\tilde{R}}(\bm{q}) = \bm{\tilde{f}}
@@ -189,25 +184,30 @@ These two rules will also be used later. Another important rule which will be us
 \section{Creating the Triangles}
 
 When modeling solids using a discrete method, the model is represented by a mesh of polygons. In this paper, triangles were
-used, so all results of this paper are based on triangle calculations.
+used, so all results of this paper are based on triangle calculations. The implementation of our triangle object can be found
+in \textbf{TRIANGLE.cpp} and \textbf{TRIANGLE.h}.
 
 In the code for this paper, a triangle object was created for cleaner implementation. Important variables to keep track of are:
 \begin{enumerate}
-  \item a vector of rest vertices. This should stay constant throughout the simulation.
-  \item a vector of actual positions, which update as the whole mesh moves.
-  \item a material model of some sort, to keep track of $\lambda$ and $\mu$ values for force calculations.
-  \item rest area; this is used in calculating the internal force and stiffness matrix.
+  \item a vector of rest vertices. This should stay constant throughout the simulation. In our code, this variable is \textbf{\_restPose}.
+  \item a vector of actual positions, which update as the whole mesh moves. In our code, this variable is \textbf{\_vertices}.
+  \item a material model of some sort, to keep track of $\lambda$ and $\mu$ values for force calculations. In our code, this variable is \textbf{\_material}.
+  \item rest area; this is used in calculating the internal force and stiffness matrix. In our code, this isn't stored as a variable, but can be calculated
+  with the function \textbf{restArea()}.
   \item precomputed coefficients for the cubic polynomial interpretation of internal force and quadratic polynomial
-  for the tangent stiffness matrix. This will be discussed in a later section.
+  for the tangent stiffness matrix. This will be discussed in a later section. In our code, the variables for the cubic polynomial terms
+  are \textbf{\_cubicCoef} for the cubic term, \textbf{\_cubic2} for the quadratic term, and \textbf{\_linearCoef} for the linear term.
+  For the quadratic polynomial, the terms are \textbf{\_quadraticCoef} for the quadratic term, \textbf{\_quad2} for the linear term, and
+  \textbf{\_constCoef} for the constant term.
 \end{enumerate}
 
 In addition to storing variables, there are a few useful functions that can go into this object as well:
 \begin{enumerate}
   \item getter/setter functions for all private variables.
-  \item a function that computes $\frac{\partial \bm{F}}{\partial \bm{u}}$.
-  \item a function that computes the deformation gradient, $\bm{F}$.
-  \item a function to compute the internal force for the triangle given the deformation gradient.
-  \item a function to compute the force Jacobian for the triangle given the deformation gradient.
+  \item a function that computes $\frac{\partial \bm{F}}{\partial \bm{u}}$: \textbf{pFpu()}.
+  \item a function that computes the deformation gradient, $\bm{F}$: \textbf{computeF()}.
+  \item a function to compute the internal force for the triangle given the deformation gradient: \textbf{computeForceVector()}.
+  \item a function to compute the force Jacobian for the triangle given the deformation gradient: \textbf{computeForceJacobian()}.
 \end{enumerate}
 
 The last three functions are not necessary for the cubic polynomial approach, but are useful for debugging purposes.
@@ -226,14 +226,41 @@ The deformation gradient can be found using the equation:
 \label{eq_F}
 \end{equation}
 
-\noindent where $\bm{D_s}$ is the spatial matrix made of the deformed vertices, $\bm{D_m}$ is the material matrix made of the rest vertices, and the three vertices of the triangle are $(x_0, x_1), (x_2, x_3), (x_4, x_5)$. Since the rest vertices stay constant throughout the simulation, $\bm{D_{m}^{-1}}$ is constant.
+\noindent where $\bm{D_s}$ is the spatial matrix made of the deformed vertices, $\bm{D_m}$ is the material matrix made of the rest vertices, and the three vertices of the triangle are $(x_0, x_1), (x_2, x_3), (x_4, x_5)$. Since the rest vertices stay constant throughout the simulation, $\bm{D_{m}^{-1}}$ is constant. As stated above, this calculation can be found
+in \textbf{TRIANGLE.cpp} within the function \textbf{computeF()}.
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Implementing Stable Neo-Hookean}
 
 This section is not necessary for the cubic polynomial approach, but it's useful as a debugging tool. In the code
 for this paper, the implementation of Stable Neo-Hookean is tied to the material of the triangle, and is called by the functions
-that calculate internal force and the force Jacobian for an individual triangle.
+that calculate internal force and the force Jacobian for an individual triangle. The implementation of the following model can be
+found in the file \textbf{NEOHOOKEAN.cpp}.
+
+A Stable Neo-Hookean deformable model is defined by the Stable Neo-Hookean strain energy:
+
+\begin{equation}
+\psi = \frac{\mu}{2}(\tr(\bm{F}^{T}\bm{F}) - 3) + \frac{\lambda}{2}(\detF(\bm{F}) - 1 - \frac{\mu}{2})^2
+\label{eq_neohookean}
+\end{equation}
+
+\noindent where $\lambda$ and $\mu$ are Lamé coefficients.
+
+In computing the internal force of a single triangle, the Piola-Kirchhoff stress tensor (the derivative of the strain energy by the deformation gradient) is used. The Piola-Kirchhoff stress tensor is:
+
+\begin{equation}
+\frac{\partial \psi}{\partial \bm{F}} = \mu\bm{F} + (\lambda\det(\bm{F}) - \lambda - \mu) \begin{bmatrix} f_3 & -f_1 \\ -f_2 & f_0 \end{bmatrix}
+\label{eq_pk1}
+\end{equation}
+
+In computing the force Jacobian of a single triangle, the energy Hessian is used:
+
+\begin{equation}
+  \begin{split}
+\frac{\partial^2 \psi}{\partial \bm{F}^2} = \mu I + \frac{\partial}{\partial F_i} (\lambda\det(\bm{F})\begin{bmatrix} f_3 & -f_1 \\ -f_2 & f_0 \end{bmatrix}) \\ - (\lambda + \mu)\frac{\partial}{\partial F_i}\begin{bmatrix} f_3 & -f_1 \\ -f_2 & f_0 \end{bmatrix}
+  \end{split}
+\label{eq_dpdf}
+\end{equation}
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Computing dF/dx}
@@ -288,26 +315,45 @@ $\vect (\bm{A}) = \begin{bmatrix} \vect \left(\begin{bmatrix} 1 & 3 \\ 2 & 4 \en
 
 This section is unnecessary for the cubic polynomial approach, but as with all the other sections, it's useful for debugging purposes. The internal force inside of the triangle can be computed using the equation
 
+\begin{equation}
+\bm{f} = \frac{\partial \psi}{\partial \bm{u}} = \vect \left(\frac{\partial \bm{F}}{\partial \bm{x}}\right)^T\cdot \vect \left(\frac{\partial \psi}{\partial \bm{F}}\right)
+\label{eq_triforce}
+\end{equation}
+
+\noindent where the terms are defined by equations \ref{eq_dFdx} and \ref{eq_pk1}, respectively. This is implemented in the \textbf{computeForceVector()}
+function in \textbf{TRIANGLE.cpp}. The force Jacobian for each triangle can be computed using the equation
+
+\begin{equation}
+\frac{\partial^2 \psi}{\partial \bm{u}^2} = \vect \left(\frac{\partial \bm{F}}{\partial \bm{x}}\right)^T\cdot \frac{\partial^2 \psi}{\partial \bm{F}^2}\cdot \vect \left(\frac{\partial \bm{F}}{\partial \bm{x}}\right)
+\label{eq_trijacob}
+\end{equation}
+
+\noindent where the terms are defined by equations \ref{eq_dFdx} and \ref{eq_dpdf}. This is implemented in the \textbf{computeForceJacobian()} function in
+\textbf{TRIANGLE.cpp} Notice how $\bm{x}$, or current vertex placement, and $\bm{u}$, vertex \textit{displacement}, are used interchangeably here. In general,
+this is possible because the internal force at rest position $\bm{\bar{x}}$ is $0$, and $\bm{x} = \bm{\bar{x}} + \bm{u}$. However, it is important to note that
+these will \textbf{not} be interchangeable in the cubic polynomial approach.
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Creating the Triangle Mesh}
 
-Now that a triangle object has been established, a triangle mesh can be built. In the code for this paper, the triangle mesh is a separate object from the individual triangles, and it stores all of the triangles in a vector. When constructing the triangle mesh, it may be useful to store a map of each vertex to its global position, so that future calculations are easier. In this implementation, the following were stored as private variables:
+Now that a triangle object has been established, a triangle mesh can be built. In the code for this paper, the triangle mesh is a separate object from the individual triangles, and it stores all of the triangles in a vector. Everything can be found within the file \textbf{TRIANGLE\_MESH.cpp}. When constructing the triangle mesh, it may be useful to store a map of each vertex to its global position, so that future calculations are easier. In this implementation, the following were stored as private variables:
 
 \begin{enumerate}
-  \item a vector of triangles, i.e. the triangle mesh.
-  \item a vertex to global index mapping.
-  \item a vector of vertex placements.
-  \item a vector of vertex rest positions.
-  \item a vector of vertex displacements.
-  \item a vector of vertex indices representing which vertices are \textbf{constrained}.
-  \item a vector of vertex indices representing which vertices are \textbf{unconstrained}.
-  \item a vector for internal force.
-  \item a vector for external force.
-  \item a mass matrix.
-  \item a vector for velocity and a vector for acceleration.
-  \item the basis reduction matrix.
-  \item a vector for the reduced basis vector.
+  \item a vector of triangles, i.e. the triangle mesh: \textbf{\_triangles}.
+  \item a vertex to global index mapping: \textbf{\_vertexToIndex}.
+  \item a vector of vertex placements: \textbf{\_vertices}.
+  \item a vector of vertex rest positions: \textbf{\_restVertices}.
+  \item a vector of vertex displacements: \textbf{\_u}.
+  \item a vector of vertex indices representing which vertices are \textbf{constrained}: \textbf{\_constrainedVertices}.
+  \item a vector of vertex indices representing which vertices are \textbf{unconstrained}: \textbf{\_unconstrainedVertices}.
+  \item a vector for internal force: \textbf{\_f}.
+  \item a vector for external force: \textbf{\_fExternal}.
+  \item a mass matrix: \textbf{\_mass}.
+  \item a vector for velocity and a vector for acceleration: unreduced velocity is \textbf{\_velocity}, reduced velocity is \textbf{\_rv};
+  unreduced acceleration is  \textbf{\_acceleration}, reduced acceleration is \textbf{\_ra}.
+  \item the basis reduction matrix: \textbf{\_U}.
+  \item a vector for the reduced basis vector: \textbf{\_q}.
 \end{enumerate}
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -336,6 +382,8 @@ While this step is not necessary for the cubic polynomial approach, the methods 
     \EndFunction
 \end{algorithmic}
 
+The actual implementation for this can be found in \textbf{TRIANGLE\_MESH.cpp} in the function \textbf{computeUnprecomputedMaterialForces()}.
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Implementing the Tangent Stiffness Matrix}
 
@@ -362,10 +410,13 @@ The process here is similar to the process of calculating the global internal fo
     \EndFunction
 \end{algorithmic}
 
+The actual implementation for this can be found in \textbf{TRIANGLE\_MESH.cpp} in the function \textbf{computeUnprecomputedStiffnessMatrix(MATRIX\& K)}.
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Implementing the Mass Matrix}
 
 The mass matrix does not change over time, so this can be initialized outside of the motion function. How mass is implemented is up to the creator.
+The mass matrix for this implementation can be found in the function \textbf{setMassMatrix(bool reduction)}.
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Implementing the Damping Matrix}
@@ -377,7 +428,7 @@ The damping matrix is calculated using the equation
 \label{eq_damp}
 \end{equation}
 
-After computing the global stiffness matrix, this should be straightforward. The alpha and beta values are constant values that are up to the creator, depending on how strong the desired force is.
+After computing the global stiffness matrix, this should be straightforward. The alpha and beta values are constant values that are up to the creator, depending on how strong the desired force is. In this implementation, $\alpha = 0.01$ and $\beta = 0.02$, and the calculation of the damping matrix can be found within the function \textbf{stepMotion(float dt, const VEC2\& outerForce, bool reduced)}.
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Implementing the Newmark Integrator}
@@ -417,120 +468,59 @@ Where $0 \leq \tilde{\beta} \leq 0.5$ and $0 \leq \tilde{\gamma} \leq 1$. We cho
 
 At this point in the paper, a fully function simulator of Stable Neo-Hookean deformable models can be created; however, they are still unreduced and lack any pre-computation. If pre-computation does not interest you, feel free to skip to the section titled \textbf{Generating a Deformation Basis} - after creating a deformation basis, reducing everything is as simple as following equations \ref{eq_basisreduction} - \ref{eq_rstiffness}.
 
-For simplicity, we derived the precomputed constant coefficients before reducing the equation. In order to have the ability to precompute constant coefficients, all variables must be extractable. In the case of unreduced Stable Neo-Hookean models, this means that we should be able to separate vertex positions, $\bm{x}$, out of the internal force and stiffness matrix calculation. Again, for simplicity, we began by separating $\bm{x}$ from the internal force equation \ref{eq_triforce} and force Jacobian equation \ref{eq_trijacob} for an individual triangle, then created global constants similar to how the global internal force and global stiffness matrix were built in sections 5.1 and 5.2.
+To fully understand everything that happens in this step, we will derived the precomputed constant coefficients before reducing the equation. In order to have the ability to precompute constant coefficients, all variables must be extractable. In the case of unreduced Stable Neo-Hookean models, this means that we should be able to separate vertex positions, $\bm{x}$, out of the internal force and stiffness matrix calculation. Again, for simplicity, we began by separating $\bm{x}$ from the internal force equation \ref{eq_triforce} and force Jacobian equation \ref{eq_trijacob} for an individual triangle. The global constants can then be created in two different ways. Method 1 follows
+a similar implementation as the creation of the non-polynomial stiffness matrix, and runs faster, but has significant memory issues and is no longer in the code. Method 2 creates
+the constants by adding all of these smaller triangle constants into their proper position in the global context. This runs much slower, but is memory efficient.
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Coefficients for the Tangent Stiffness Matrix  - REWRITE FOR NEOHOOKEAN}
+\subsection{Coefficients for the Tangent Stiffness Matrix}
 
-Looking at equation~\ref{eq_dpdf}, there is clearly one quadratic term, and one constant matrix, $-4[\mu + \lambda]\bm{I}$. From this, we can already derive the constant coefficient term:
+Looking at equation~\ref{eq_dpdf}, there is one quadratic term, and one constant matrix, $\mu\bm{I} - (\lambda + \mu)\frac{\partial}{\partial \bm{F_i}} \begin{bmatrix} f_3 & -f_1 \\ -f_2 & f_0 \end{bmatrix}$. From this, we can derive the constant coefficient term from equation~\ref{eq_trijacob}:
 
 \begin{equation}
-  \bm{Q} = - \vect \left(\frac{\partial \bm{F}}{\partial \bm{x}}\right)^T 4[\mu + \lambda]\bm{I} \vect \left(\frac{\partial \bm{F}}{\partial \bm{x}}\right)
+  \bm{Q} = \vect \left(\frac{\partial \bm{F}}{\partial \bm{x}}\right)^T
+  \left(\mu\bm{I} - (\lambda + \mu)\frac{\partial}{\partial \bm{F}_i}  \begin{bmatrix} f_3 & -f_1 \\ -f_2 & f_0 \end{bmatrix} \right)
+  \vect \left(\frac{\partial \bm{F}}{\partial \bm{x}}\right)
   \label{eq_unreducedConst}
 \end{equation}
 
-The quadratic term is trickier. Looking at the $\mu$ term of $\frac{\partial^2 \psi}{\partial \bm{F}^2}$ alone, $\left[\frac{\partial \bm{F}}{\partial F_i}\bm{F^TF} + \bm{F}\frac{\partial \bm{F}}{\partial F_i}^T\bm{F} + \bm{FF^T}\frac{\partial \bm{F}}{\partial F_i}\right]$ decomposes into
+\bigskip
+The quadratic term is harder. Expanded, the quadratic term, $\lambda \detF(\bm{F})\begin{bmatrix} f_3 & -f_1 \\ -f_2 & f_0 \end{bmatrix}$ is:
 
 \begin{center}
-$\frac{\partial \bm{F}}{\partial F_i}\bm{F^TF} = \begin{bmatrix} f_{0}^2 + f_{1}^2 & 0 & f_0f_2 + f_1f_3 & 0 \\
-0 & f_{0}^2 + f_{1}^2 & 0 & f_0f_2 + f_1f_3 \\
-f_0f_2 + f_1f_3 & 0 & f_{2}^2 + f_{3}^2 & 0 \\
-0 & f_0f_2 + f_1f_3 & 0 & f_{2}^2 + f_{3}^2 \end{bmatrix}$
-
-\bigskip
-$\bm{F}\frac{\partial \bm{F}}{\partial F_i}^T\bm{F} = \begin{bmatrix} f_{0}^2 & f_0f_1 & f_0f_2 & f_1f_2  \\
-f_0f_1 & f_{1}^2 & f_0f_3 & f_1f_3 \\
-f_0f_2 & f_0f_3 & f_{2}^2 & f_2f_3 \\
-f_1f_2 & f_1f_3 & f_2f_3 & f_{3}^2 \end{bmatrix}$
-
-\bigskip
-$\bm{FF^T}\frac{\partial \bm{F}}{\partial F_i} = \begin{bmatrix} f_{0}^2 + f_{2}^2 & f_0f_1 + f_2f_3 & 0 & 0  \\
-f_0f_1 + f_2f_3 & f_{1}^2 + f_{3}^2 & 0 & 0 \\
-0 & 0 & f_{0}^2 + f_{2}^2 & f_0f_1 + f_2f_3 \\
-0 & 0 & f_0f_1 + f_2f_3 & f_{1}^2 + f_{3}^2 \end{bmatrix}$
+$\lambda \detF(\bm{F})\begin{bmatrix} f_3 & -f_1 \\ -f_2 & f_0 \end{bmatrix} = \lambda \begin{bmatrix} f_{3}^2 & -f_2f_3 & -f_1f_3 & 2f_0f_3 - f_1f_2 \\
+-f_2f_3 & f_{2}^2 & 2f_1f_2 - f_0f_3 & -f_0f_2 \\
+-f_1f_3 & 2f_1f_2 - f_0f_3 & f_{1}^2 & -f_0f_1 \\
+2f_0f_3 - f_1f_2 & -f_0f_2 & -f_0f_1 & f_{0}^2 \end{bmatrix}$
 \end{center}
 
-In order to separate out all of the $\bm{x}$'s, we can first separate all of the $\bm{f}$ terms. This can be done using tensors. By working backwards from the matrices above, a fourth order tensor, $\bm{C_{\mu}}$, can be derived, such that
+In order to separate out all of the $\bm{x}$'s, we can first separate all of the $\bm{f}$ terms. This can be done using tensors. By working backwards from the matrices above, a fourth order tensor, $\bm{C_f}$, can be derived, such that
 
 \begin{equation}
-    \bm{C_{\mu}} = \begin{bmatrix}
-    \begin{bmatrix} 3 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-    \begin{bmatrix} 0 & 2 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 1 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-    \begin{bmatrix} 0 & 0 & 2 & 0 \\ 0 & 0 & 0 & 1 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-    \begin{bmatrix}0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
-      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 2 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 1 & 0 \end{bmatrix} &
-      \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 3 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
-      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 1 & 0 & 0 & 0 \end{bmatrix} &
-      \begin{bmatrix}0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 2 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
-        \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 2 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \end{bmatrix} &
-        \begin{bmatrix} 0 & 0 & 0 & 1 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-        \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 3 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
-        \begin{bmatrix}0 & 1 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 2 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 1 & 0 & 0 & 0 \\ 0 & 2 & 0 & 0 \end{bmatrix} &
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 2 & 0 \end{bmatrix} &
-          \begin{bmatrix}0 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 3 \end{bmatrix} \end{bmatrix}
+    \bm{C_f} = \begin{bmatrix}
+    \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
+    \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & -1 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
+    \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & -1 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
+    \begin{bmatrix} 0 & 0 & 0 & 2 \\ 0 & 0 & -1 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
+      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & -1 & 0 \end{bmatrix} &
+      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
+      \begin{bmatrix} 0 & 0 & 0 & -1 \\ 0 & 0 & 2 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
+      \begin{bmatrix} 0 & 0 & -1 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
+        \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & -1 & 0 & 0 \end{bmatrix} &
+        \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 2 & 0 & 0 \\ -1 & 0 & 0 & 0 \end{bmatrix} &
+        \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
+        \begin{bmatrix} 0 & -1 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
+          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & -1 & 0 & 0 \\ 2 & 0 & 0 & 0 \end{bmatrix} &
+          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ -1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
+          \begin{bmatrix} 0 & 0 & 0 & 0 \\ -1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
+          \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \end{bmatrix}
 \label{_eq_quadmu}
 \end{equation}
 
 And
 \begin{equation}
-\begin{split}
-4\mu\left[\frac{\partial \bm{F}}{\partial F_i}\bm{F^TF} + \bm{F}\frac{\partial \bm{F}}{\partial F_i}^T\bm{F} + \bm{FF^T}\frac{\partial \bm{F}}{\partial F_i}\right] =
-\\ 4\mu \bm{C_{\mu}} \bar{\times}_4 \vect (\bm{F}) \bar{\times}_3 \vect (\bm{F})
-\end{split}
+\lambda\detF(\bm{F})\begin{bmatrix} f_3 & -f_1 \\ -f_2 & f_0 \end{bmatrix} = \lambda \bm{C_f} \bar{\times}_4 \vect (\bm{F}) \bar{\times}_3 \vect (\bm{F})
 \end{equation}
-
-Similar to the $\mu$ term, the $\lambda$ term, which can be split into the two terms:
-
-\begin{center}
-  $2\lambda \left(\frac{\partial \bm{F}}{\partial F_i}\tr \left(\bm{F^TF}\right) \right)  = 2\lambda \left(f_{0}^2 + f_{1}^2 + f_{2}^2  + f_{3}^2\right) \begin{bmatrix}
-  1 & 0 & 0 & 0  \\
-  0 & 1  & 0 & 0 \\
-  0 & 0 & 1  & 0 \\
-  0 & 0 & 0 & 1  \end{bmatrix}$
-
-  \bigskip
-  $2\lambda \left(\bm{F}\frac{\partial \tr \left(\bm{F^TF}\right)}{\partial F_i}\right)  = 2\lambda \begin{bmatrix}
-  2f_{0}^2 & 2f_0f_1 & 2f_0f_2 & 2f_0f_3  \\
-  2f_0f_1 & 2f_{1}^2 & 2f_1f_2 & 2f_1f_3 \\
-  2f_0f_2 & 2f_1f_2 & 2f_{2}^2 & 2f_2f_3 \\
-  2f_0f_3 & 2f_1f_3 & 2f_2f_3 & 2f_{3}^2  \end{bmatrix}$
-\end{center}
-
-has a fourth order tensors that can be derived:
-
-\begin{equation}
-    \bm{C_{\lambda}} = \begin{bmatrix}
-    \begin{bmatrix} 3 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
-    \begin{bmatrix} 0 & 2 & 0 & 0 \\ 2 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-    \begin{bmatrix} 0 & 0 & 2 & 0 \\ 0 & 0 & 0 & 0 \\ 2 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-    \begin{bmatrix}0 & 0 & 0 & 2 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 2 & 0 & 0 & 0 \end{bmatrix} \\
-      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-      \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 3 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
-      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 2 & 0 \\ 0 & 2 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-      \begin{bmatrix}0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 2 \\ 0 & 0 & 0 & 0 \\ 0 & 2 & 0 & 0 \end{bmatrix} \\
-        \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-        \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-        \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 3 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
-        \begin{bmatrix}0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 2 \\ 0 & 0 & 2 & 0 \end{bmatrix} \\
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-          \begin{bmatrix}1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 3 \end{bmatrix} \end{bmatrix}
-\label{_eq_quadlambda}
-\end{equation}
-
-And
-\begin{equation}
-2\lambda \left[\frac{\partial \bm{F}}{\partial F_i}\tr \left(\bm{F^TF}\right) + \bm{F}\frac{\partial \tr \left(\bm{F^TF}\right)}{\partial F_i} \right] = 2\lambda \bm{C_{\lambda}} \bar{\times}_4 \vect (\bm{F}) \bar{\times}_3 \vect (\bm{F})
-\end{equation}
-
-So the entire quadratic term of equation~\ref{eq_dpdf} can be written as
-
-\begin{multline}
-\bm{C_f} \bar{\times}_4 \vect (\bm{F}) \bar{\times}_3 \vect (\bm{F}) =  \\ \left(4\mu \bm{C_{\mu}} + 2\lambda \bm{C_{\lambda}}\right) \bar{\times}_4 \vect (\bm{F}) \bar{\times}_3 \vect (\bm{F})
-\end{multline}
 
 This still only separates $\bm{F}$, not $\bm{x}$. However, since $\bm{F} = \frac{\partial \bm{F}}{\partial \bm{x}}\bm{x}$, we can rearrange this equation using our tensor product rules (equations~\ref{eq_vectorMode}-\ref{eq_productDecompose}) so that
 \begin{center}
@@ -562,8 +552,10 @@ With both the quadratic coefficient and the constant matrix, the force jacobian 
 \label{eq_unreducedQuadratic}
 \end{equation}
 
+The implementation of this can be found in the file \textbf{TRIANGLE.cpp} within the constructor.
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsubsection{Creating the Global Tangent Stiffness Matrix Coefficients  - REWRITE FOR NEOHOOKEAN}
+\subsubsection{Creating the Global Tangent Stiffness Matrix Coefficients Method 1}
 
 Now that the constant terms for the force Jacobian for each triangle have been computed, we can create global constant terms for the tangent stiffness matrix in a similar manner to how the global tangent stiffness matrix was computed earlier.
 
@@ -617,90 +609,60 @@ After all coefficients are precomputed, the global stiffness matrix calculation 
   \bm{K}(\bm{x}) = \bm{C_{global}} \bar{\times}_4 \bm{x} \bar{\times}_3 \bm{x} + \bm{Q_{global}}
 \end{equation}
 
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Coefficients for Internal Force  - REWRITE FOR NEOHOOKEAN}
+This implementation is not included in the current code, but can be found by going back into previous versions of the repository. This method is no longer used because when $n$ (the number of vertices), is sufficiently large, the user will run into memory issues, making the code impossible to run. To overcome this issue, a new method was created. Method 2 will be covered in the reduction portion of this writeup, since it incorporates reduction directly into the global build.
 
-Looking at equation~\ref{eq_pk1}, there is clearly one cubic term and one linear term. Since the force Jacobian is the derivative of internal force, the linear coefficient for internal force is actually also $\bm{Q}$ (eq \ref{eq_unreducedConst}). The connection between the cubic term and the quadratic term, however, is not as clean, because the cubic term can be reduced into a fourth order tensor as well. We are able to reduce the coefficient for the cubic term into a fourth order tensor because equation~\ref{eq_pk1} is vectorized, reducing its order by one.
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Coefficients for Internal Force}
+
+In equation~\ref{eq_pk1}, there is one cubic term and one linear term. Since the force Jacobian is the derivative of internal force, the linear coefficient for internal force is actually also $\bm{Q}$ (eq \ref{eq_unreducedConst}). The connection between the cubic term and the quadratic term, however, is not as clean, because the cubic term can be reduced into a fourth order tensor as well. We are able to reduce the coefficient for the cubic term into a fourth order tensor because equation~\ref{eq_pk1} is vectorized, reducing its order by one.
 
 The vectorized cubic term, before separating $\bm{x}$, is
 
 \begin{center}
-  $\vect \left( 4\mu\bm{FF^TF} + 2\lambda\tr\left(\bm{F^TF}\right)\bm{F}\right)$
+  $\vect \left( \lambda\detF(\bm{F}) \begin{bmatrix} f_3 & -f_1 \\ -f_2 & f_0 \end{bmatrix} \right)$
 \end{center}
 
-where
+which expands to
 
 \begin{center}
-  $\vect \left( 4\mu\bm{FF^TF} \right) = 4\mu
+  $\lambda
   \begin{bmatrix}
-    f_{0}^3 + f_0f_{1}^2 + f_0f_{2}^2 + f_1f_2f_3 \\
-    f_{0}^2f_{1} + f_{1}^3 + f_0f_2f_3 + f_1f_{3}^2 \\
-    f_{0}^2f_{2} + f_0f_1f_3 + f_{2}^3 + f_2f_{3}^2 \\
-    f_0f_1f_2 + f_{1}^2f_3 + f_{2}^2f_3 + f_{3}^3 \\
+    f_0f_{3}^2 - f_1f_2f_3 \\
+    f_1f_{2}^2 - f_0f_2f_3 \\
+    f_{1}^2f_{2} - f_0f_1f_3 \\
+    f_{0}^2f_3 - f_0f_1f_2 \\
     \end{bmatrix}$
-
-    \bigskip
-    $\vect \left( 2\lambda\tr\left(\bm{F^TF}\right)\bm{F} \right) = 2\lambda
-    \begin{bmatrix}
-      f_{0}^3 + f_0f_{1}^2 + f_0f_{2}^2 + f_0f_{3}^2 \\
-      f_{0}^2f_1 + f_{1}^3 + f_1f_{2}^2 + f_1f_{3}^2 \\
-      f_{0}^2f_2 + f_2f_{1}^2 + f_{2}^3 + f_2f_{3}^2 \\
-      f_{0}^2f_3 + f_3f_{1}^2 + f_3f_{2}^2 + f_{3}^3\\
-      \end{bmatrix}$
 \end{center}
 
-In order to separate out all of the $\bm{x}$'s, we can first separate all of the $\bm{f}$ terms, like we did for the force jacobian. By working backwards from the matrices above, two fourth order tensor, $\bm{A_{\mu}}$ and $\bm{A_{\lambda}}$, can be derived, such that
+In order to separate out all of the $\bm{x}$'s, we can first separate all of the $\bm{f}$ terms, like we did for the force jacobian. By working backwards from the matrix above, two fourth order tensor, $\bm{A_{f}}$ can be derived such that
 
 \begin{equation}
     \bm{A_{\mu}} = \begin{bmatrix}
-    \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-    \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 1 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
+    \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
+    \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & -1 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
     \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
     \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
-      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 1 & 0 \end{bmatrix} &
-      \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
+      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & -1 & 0 \end{bmatrix} &
+      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
       \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
       \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
         \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
         \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-        \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
-        \begin{bmatrix} 0 & 1 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
+        \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
+        \begin{bmatrix} 0 & -1 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
           \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
           \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} \\ \end{bmatrix}
+          \begin{bmatrix} 0 & 0 & 0 & 0 \\ -1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
+          \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\ \end{bmatrix}
 \label{eq_cubmu}
 \end{equation}
 
-and
 
-\begin{equation}
-    \bm{A_{\lambda}} = \begin{bmatrix}
-    \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
-    \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-    \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-    \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
-      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-      \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
-      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-      \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
-        \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-        \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-        \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} &
-        \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} \\
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-          \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix} &
-          \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} \\ \end{bmatrix}
-\label{eq_cublambda}
-\end{equation}
-
-such that
+where
 
 \begin{multline}
     \bm{A_f} \bar{\times}_4 \vect \bm{F} \bar{\times}_3 \vect \bm{F}  \bar{\times}_2 \vect \bm{F}
-    \\ = \left( 4\mu\bm{A_{\mu}} + 2\lambda\bm{A_{\lambda}}\right) \bar{\times}_4 \vect \bm{F} \bar{\times}_3 \vect \bm{F} \bar{\times}_2 \vect \bm{F}
-    \\ = \vect \left( 4\mu\bm{FF^TF} + 2\lambda\tr\left(\bm{F^TF}\right)\bm{F}\right)
+    \\ = \vect \left( \lambda\detF(\bm{F}) \begin{bmatrix} f_3 & -f_1 \\ -f_2 & f_0 \end{bmatrix} \right)
 \end{multline}
 
 Then, by replacing $\bm{F} = \left( \frac{\partial \bm{F}}{\partial \bm{x}} \bm{x}\right)$ and pushing $\frac{\partial \bm{F}}{\partial \bm{x}}$ to the left side of the equation, we end up with a fourth order tensor, $\bm{A_{pk}}$, such that
@@ -725,8 +687,10 @@ With both the cubic coefficient and the linear matrix, the internal force can no
 \label{eq_unreducedCubic}
 \end{equation}
 
+The implementation of this can be found int \textbf{TRIANGLE.cpp} within the constructor function.
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsubsection{Creating the Global Internal Force Coefficients  - REWRITE FOR NEOHOOKEAN}
+\subsubsection{Creating the Global Internal Force Coefficients Method 1}
 
 Now that the coefficients for the internal force for each triangle has been computed, we can create global constant coefficients for internal force in a similar manner to how the global internal force was computed earlier.
 
@@ -758,7 +722,7 @@ Now that the coefficients for the internal force for each triangle has been comp
     \EndFunction
 \end{algorithmic}
 
-Like the pseudocode for computing the global stiffness matrix coefficients, the assignment lines are abbreviated in the same way. Refer back to \textbf{Creating the Global Tangent Stiffness Matrix Coefficients} for a refresher.
+Like the pseudocode for computing the global stiffness matrix coefficients, the assignment lines are abbreviated in the same way. Refer back to \textbf{Creating the Global Tangent Stiffness Matrix Coefficients Method 1} for a refresher.
 
 Also note how a separate global matrix, $\bm{P_{global}}$, was created here, despite the fact the linear internal force coefficient is identical to the constant force Jacobian coefficient for a single triangle. This is because the loops they run through are slightly different - in the pseudocode above, $\bm{Q}$ is added to $\bm{P_{global}}$ so long as the first vertex is unconstrained. In the pseudocode for the stiffness matrix, $\bm{Q}$ is added to $\bm{Q_{global}}$ only if the first \textbf{and} the second vertex are unconstrained. $\bm{P_{global}} \neq \bm{Q_{global}}$!
 
@@ -767,6 +731,8 @@ After computing coefficients, evaluating the internal force at any point in time
 \begin{equation}
   \bm{R}(\bm{x}) = \bm{A_{global}} \bar{\times}_4 \bm{x} \bar{\times}_3 \bm{x} \bar{\times}_2 \bm{x} + \bm{P_{global}}\bm{x}
 \end{equation}
+
+This implementation is not included in the current code for the same reason as the stiffness matrix method 1, but can be found by going back into previous versions of the repository. Method 2 will be covered in the reduction portion of this writeup, since it incorporates reduction directly into the global build.
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Adjusting Polynomials for Displacement}
@@ -901,9 +867,9 @@ The global coefficients can be built the same way as before, with an extra tenso
 \end{equation}
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Generating a Deformation Basis  - REWRITE WITH UPDATES}
+\section{Generating a Deformation Basis}
 
-There are many ways to generate a deformation basis. It's a hard, open problem in solid mechanics, as there is no unanimously used algorithm for it. The approach used for this paper was the mass-PCA approach. This was achieved by running the unreduced program to record $r \in \mathbb{R}$ distinct deformations. Each vertex displacement for a single deformation was stored in one column of a matrix, so that the final matrix of deformed coordinates was $\bm{X} \in \mathbb{R}^{2n \times r}$.
+There are many ways to generate a deformation basis. It's a hard, open problem in solid mechanics, as there is no unanimously used algorithm for it. The approach used for this paper was the mass-PCA approach. This was achieved by running the unreduced program to record some chosen number of distinct deformations. Each vertex displacement for a single deformation was normalized and stored in one column of a matrix. In addition to displacements, the internal force at each time step was normalized and included as a column in the matrix, and the normalized external force for each different simulation. The code for this process can be found in \textbf{simulation.cpp} within the function \textbf{readCommandLine()}. The resulting matrix $\bm{X}$ is exported as a file, and read back into the program in \textbf{TRIANGLE\_MESH.cpp} when creating the triangle mesh.
 
 After computing this matrix, SVD was run on $\bm{X}$, and the first $r$ columns of the $\bm{U_{SVD}}$ matrix became the deformation basis, $\bm{U} \in \mathbb{R}^{2n \times r}$. This basis works well for stationary objects, but it does not incorporate translation. To create a basis that allows for translation, create two vectors $\bm{t_x}, \bm{t_y} \in \mathbb{R}^{2n}$, such that
 $\bm{t_x}[i] = 1$ when $i$ is an x coordinate, and $0$ otherwise;
@@ -923,15 +889,22 @@ Normalize both $\bm{t_x}$ and $\bm{t_y}$, then append them so they are the first
     \EndFunction
 \end{algorithmic}
 
+The implementation for a stationary deformation basis can be found in \textbf{TRIANGLE\_MESH.cpp} within the function \textbf{basisNoTranslation()}. No implementation including translation has been written so far.
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Reducing the Euler-Lagrange Equation of Motion - REWRITE WITH UPDATES}
+\section{Reducing the Euler-Lagrange Equation of Motion}
 
 Now that a deformation basis has been generated, it can be used to reduce the order of the Euler-Lagrange equation of motion calculation. The next three subsections explain how these reductions can be done.
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Reducing the Internal Force - REWRITE WITH UPDATES}
+\subsection{Reducing the Internal Force}
 
-In order to reduce the internal forces the cubic polynomial way, the displacement adjusted formula must be used. Assuming that equation \ref{eq_globalForce} is used, reducing internal force is as simple as reducing every precomputed coefficient:
+There are two different ways to reduce the global internal force.
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Method 1}
+
+This is only relevent for the method 1 implementation of the global internal force. In order to reduce the internal forces the cubic polynomial way, the displacement adjusted formula must be used. Assuming that equation \ref{eq_globalForce} is used, reducing internal force is as simple as reducing every precomputed coefficient:
 
 \begin{equation}
   \bm{\tilde{A}_{global}} = \bm{A_{global}} \times_4 \bm{U}^T  \times_3 \bm{U}^T  \times_2 \bm{U}^T  \times_1 \bm{U}^T
@@ -954,9 +927,20 @@ With these reduced coefficients, the reduced internal force is:
 \end{equation}
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Reducing the Global Tangent Stiffness Matrix - REWRITE WITH UPDATES}
+\subsubsection{Method 2}
 
-In order to reduce the tangent stiffness matrix the polynomial way, the displacement adjusted formula must be used. Assuming that equation \ref{eq_globalStiffness} is used, reducing the stiffness matrix is as simple as reducing every precomputed coefficient:
+As stated earlier, the current implementation of this paper does not follow method 1 of building the global internal force. The method that is currently used combines
+the reduction of the global internal force into its initial creation in order to save on memory.
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Reducing the Global Tangent Stiffness Matrix}
+
+There are two different ways to reduce the global tangent stiffness matrix.
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Method 1}
+
+This is only relevent for the method 1 implementation of the global tangent stiffness matrix. In order to reduce the tangent stiffness matrix the polynomial way, the displacement adjusted formula must be used. Assuming that equation \ref{eq_globalStiffness} is used, reducing the stiffness matrix is as simple as reducing every precomputed coefficient:
 
 \begin{equation}
   \bm{\tilde{C}_{global}} = \bm{C_{global}} \times_4 \bm{U}^T  \times_3 \bm{U}^T  \times_2 \bm{U}^T  \times_1 \bm{U}^T
@@ -979,6 +963,13 @@ With these reduced coefficients, the reduced stiffness matrix is:
 \end{equation}
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Method 2}
+
+As stated earlier, the current implementation of this paper does not follow method 1 of building the global tangent stiffness matrix. The method that is currently used combines
+the reduction of the global tangent stiffness matrix into its initial creation in order to save on memory.
+
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Reducing All Other Forces}
 
 For reducing external force and mass, follow equations \ref{eq_rmass} and \ref{eq_rexternal}. The reduced damping matrix can be calculated after mass and stiffness are reduced, so that
@@ -990,18 +981,18 @@ For reducing external force and mass, follow equations \ref{eq_rmass} and \ref{e
 After everything is reduced, run the Newmark integrator exactly as before. Refer back to the section titled \textbf{Implementing the Newmark Integrator} for a reminder of how to implement it.
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Discussion}
+\section{Current Bugs}
 
-Hopefully, this paper has been clear enough that it is now possible to reproduce this work.
+Help
 
-Additionally, there is the possibility that some of the tensors this paper uses can be flattened in some way. Most of the tensors are sparse, and storing the entire structure full of zeros is a waste of space and computation time.
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{acknowledgment}
+\section{Potential Future Steps}
 
-TO DO
-
-\end{acknowledgment}
+This is an ongoing list of potential future steps for this project. As of now, possible extensions are:
+\begin{enumerate}
+  \item There is the possibility that some of the tensors this paper uses can be flattened in some way. Most of the tensors are sparse, and storing the entire structure full of zeros is a waste of space and computation time.
+\end{enumerate}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
