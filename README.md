@@ -4,6 +4,21 @@
 ## Instructions
 To compile the code, run make within 2d/projects/simulation_code. After compiling, all code should be run from within the 2D directory.
 
+### Choose your Material
+Before running any commands, first make sure the material model is correct. In TRIANGLE.cpp and TRIANGLE_MESH.cpp, there is a global constant named MATMODEL. This constant should be the same in both files.
+
+For Stable Neo-Hookean simulations,
+
+```{r}
+MATMODEL = 1
+```
+
+For StVK simulations,
+
+```{r}
+MATMODEL = 0
+```
+
 ### Pre-made Commands
 There are some pre-made commands you can run. For example, executing
 
